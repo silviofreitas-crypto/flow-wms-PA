@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; padding: 2rem; }
+    .card-modern { background: white; border-radius: 1.25rem; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+  </style>
+</head>
+<body>
+  <div class="max-w-6xl mx-auto flex flex-col gap-6 h-[85vh]">
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 card-modern p-6 shrink-0 border-t-4 border-emerald-500">
+      <div class="flex items-center gap-4">
+        <div class="w-14 h-14 bg-emerald-50 text-emerald-500 rounded-2xl flex items-center justify-center text-2xl border border-emerald-100 shadow-sm"><i class="fa-solid fa-list-check"></i></div>
+        <div><h1 class="text-3xl font-black text-slate-800 tracking-tight">FUP de Fechamento</h1><p class="text-slate-500 font-bold text-sm">Conciliação de saldos e rastreabilidade da operação</p></div>
+      </div>
+      <button onclick="carregarFechamentos()" class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-5 py-3 rounded-xl font-bold text-sm flex items-center gap-2 shadow-sm transition-colors active:scale-95"><i class="fa-solid fa-rotate-right text-emerald-500"></i> Atualizar Lista</button>
+    </div>
+
+    <div class="card-modern overflow-hidden flex-1 flex flex-col">
+      <div class="bg-white border-b border-slate-100 p-5 shrink-0"><h3 class="text-[11px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2"><i class="fa-solid fa-lock text-emerald-500"></i> Planos Aguardando FUP</h3></div>
+      <div class="flex-1 overflow-y-auto custom-scrollbar p-2">
+        <table class="w-full text-left min-w-[1000px]">
+          <thead class="bg-slate-50 sticky top-0 z-10">
+            <tr>
+              <th class="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 w-[10%]">Plano</th>
+              <th class="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 w-[20%]">Item / Lote</th>
+              <th class="p-4 text-[10px] font-black text-blue-500 uppercase tracking-widest border-b border-slate-200 text-center w-[15%]">Produção Declarou</th>
+              <th class="p-4 text-[10px] font-black text-cyan-600 uppercase tracking-widest border-b border-slate-200 text-center w-[15%]">Logística Puxou</th>
+              <th class="p-4 text-[10px] font-black text-red-500 uppercase tracking-widest border-b border-slate-200 text-center w-[15%]">Diferença</th>
+              <th class="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 text-center w-[25%]">Ações de FUP</th>
+            </tr>
+          </thead>
+          <tbody id="tabelaFechamentos" class="divide-y divide-slate-100">
+            <tr><td colspan="6" class="text-center py-10 font-bold text-slate-400">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const client = window.supabase.createClient('https://cbrwmscaidyeaamyfiyt.supabase.co', 'sb_publishable_neiGbVa2X1nBfX5wT3UGYw_3RWe43_G');
+    window.onload = () => carregarFechamentos();
+
+    async function carregarFechamentos() {
+      const tb = document.getElementById('tabelaFechamentos');
+      tb.innerHTML = '<tr><td colspan="6" class="text-center py-10 font-bold text-slate-400"><i class="fa-solid fa-spinner fa-spin"></i> Buscando...</td></tr>';
+      
+      const { data, error } = await client.from('wms_planos_producao').select('*').eq('status', 'AGUARDANDO FECHAMENTO').order('id', { ascending: false });
+      if (error || !data || data.length === 0) return tb.innerHTML = '<tr><td colspan="6" class="text-center py-16 font-bold text-slate-400 text-lg">Tudo em paz! Nenhum lote pendente de fechamento.</td></tr>';
+
+      const {data: prods} = await client.from('produtos_moove').select('*');
+      let dictProd = {}; if(prods) prods.forEach(p => dictProd[p.n_item] = p);
+
+      let html = '';
+      for(let d of data) {
+        const { data: paletes } = await client.from('wms_paletes').select('qtd').eq('plano_id', d.id);
+        let puxado = 0; if(paletes) puxado = paletes.reduce((acc, p) => acc + Number(p.qtd), 0);
+        
+        let prod = parseFloat(d.qtd_declarada_fim);
+        let diff = Math.abs(prod - puxado);
+        
+        let desc = dictProd[d.n_item] ? dictProd[d.n_item].descricao : 'S/ DESCRIÇÃO';
+        
+        let btnCor = diff === 0 ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-500 hover:bg-red-600';
+        let iconeBtn = diff === 0 ? 'fa-check' : 'fa-triangle-exclamation';
+        let alertaDiff = diff !== 0 ? `<div class="bg-red-50 border border-red-200 text-red-600 text-[10px] font-bold px-2 py-1 rounded mt-1 flex items-center justify-center"><i class="fa-solid fa-xmark mr-1"></i> Falta ajuste para fechar</div>` : '';
+
+        html += `<tr class="hover:bg-slate-50 transition-colors">
+          <td class="p-4">
+            <span class="text-xs font-black text-slate-600 block">#${d.id}</span>
+            <span class="text-[9px] font-bold text-amber-600 bg-amber-50 px-1 py-0.5 rounded border border-amber-100 mt-1 block w-fit">${d.linha_envase || 'S/ Linha'}</span>
+          </td>
+          <td class="p-4">
+            <span class="font-bold text-slate-700 text-xs bg-white border border-slate-200 shadow-sm px-2 py-1 rounded block w-fit mb-1">${d.n_item}</span>
+            <span class="block text-[10px] font-bold text-slate-500 truncate max-w-[200px]" title="${desc}">${desc}</span>
+            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1 block">LOTE: ${d.lote}</span>
+          </td>
+          <td class="p-4 text-center"><div class="bg-blue-50 border border-blue-200 text-blue-700 rounded-lg p-2"><span class="block text-lg font-black">${prod}</span><span class="text-[8px] uppercase tracking-widest">Declarado Prod</span></div></td>
+          <td class="p-4 text-center"><div class="bg-cyan-50 border border-cyan-200 text-cyan-700 rounded-lg p-2"><span class="block text-lg font-black">${puxado}</span><span class="text-[8px] uppercase tracking-widest">Puxado Log (Físico)</span></div></td>
+          <td class="p-4 text-center">
+            <span class="${diff===0 ? 'text-emerald-500 bg-emerald-50 border-emerald-100' : 'text-red-500 bg-red-50 border-red-100'} font-black text-lg px-3 py-1 rounded-lg border"><i class="fa-solid ${iconeBtn} text-sm mr-1"></i> ${diff}</span>
+          </td>
+          <td class="p-4 text-center">
+            <div class="flex flex-col gap-2">
+              <button onclick='verHistorico(${d.id}, "${d.lote}")' class="bg-slate-100 border border-slate-200 hover:bg-slate-200 text-slate-600 px-3 py-2 rounded-lg font-bold text-xs shadow-sm transition-all flex justify-center items-center gap-2"><i class="fa-solid fa-clock-rotate-left"></i> Ver Histórico</button>
+              <button onclick='encerrarPlano(${d.id}, "${d.n_item}", "${d.lote}", "${d.data_fabricacao}", ${puxado}, ${diff})' class="${btnCor} text-white px-3 py-2 rounded-lg font-bold text-xs shadow-md active:scale-95 transition-all w-full flex justify-center items-center gap-2"><i class="fa-solid fa-lock"></i> Finalizar</button>
+              ${alertaDiff}
+            </div>
+          </td>
+        </tr>`;
+      }
+      tb.innerHTML = html;
+    }
+
+    async function verHistorico(planoId, lote) {
+      Swal.fire({title: 'Buscando rastro...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+      
+      const { data, error } = await client.from('wms_paletes').select('*').eq('plano_id', planoId).order('seq_producao', { ascending: true });
+
+      if (error || !data || data.length === 0) {
+        return Swal.fire('Histórico Vazio', 'Nenhum palete foi puxado para este plano ainda.', 'info');
+      }
+
+      let trs = '';
+      data.forEach(p => {
+        let dt = new Date(p.recebido_em).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+        trs += `
+          <tr class="border-b border-slate-100 hover:bg-slate-50">
+            <td class="py-2.5 px-3 text-blue-600 font-bold text-xs">${p.codigo_palete}</td>
+            <td class="py-2.5 px-3 text-center"><span class="bg-slate-100 border border-slate-200 text-slate-700 px-2 py-0.5 rounded font-black text-xs">${p.seq_producao}</span></td>
+            <td class="py-2.5 px-3 text-center text-slate-500 font-medium text-[11px]">${dt}</td>
+            <td class="py-2.5 px-3 text-right text-[10px] uppercase font-bold text-slate-500">${p.recebido_por}</td>
+          </tr>`;
+      });
+
+      let tb = `
+        <div class="max-h-[350px] overflow-y-auto custom-scrollbar border border-slate-200 rounded-xl">
+          <table class="w-full text-left">
+            <thead class="bg-slate-100 sticky top-0">
+              <tr>
+                <th class="py-2 px-3 text-[10px] font-black text-slate-500 uppercase">Palete (SSCC)</th>
+                <th class="py-2 px-3 text-[10px] font-black text-slate-500 uppercase text-center">Seq</th>
+                <th class="py-2 px-3 text-[10px] font-black text-slate-500 uppercase text-center">Data/Hora Logística</th>
+                <th class="py-2 px-3 text-[10px] font-black text-slate-500 uppercase text-right">Conferente</th>
+              </tr>
+            </thead>
+            <tbody>${trs}</tbody>
+          </table>
+        </div>`;
+
+      Swal.fire({
+        title: `<div class="text-left"><span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Rastreabilidade</span><br>Lote: <span class="text-blue-600">${lote}</span></div>`,
+        html: tb,
+        width: '700px',
+        confirmButtonColor: '#0f172a',
+        confirmButtonText: 'Fechar Histórico'
+      });
+    }
+
+    async function encerrarPlano(id, nItem, lote, dataFab, puxadoLogistica, diff) {
+      if (diff !== 0) {
+        return Swal.fire({
+          title: 'Divergência Pendente',
+          html: `<div class="text-left text-sm text-slate-600">O lote não pode ser encerrado até que o saldo físico puxado seja igual ao declarado.<br><br><b>O que fazer?</b><br>1. Clique em <b class="text-slate-800">"Ver Histórico"</b> para achar qual Seq está faltando.<br>2. Peça para a operação puxar o Seq faltante no PDA ou vá no <b class="text-indigo-600">Mapa de Estoque</b> e faça uma Entrada Manual do palete perdido.</div>`,
+          icon: 'error',
+          confirmButtonColor: '#0f172a'
+        });
+      }
+
+      const { isConfirmed } = await Swal.fire({
+        title: 'Finalizar FUP',
+        html: `<p class="text-slate-600 mb-4">A conciliação está perfeita! O saldo de <b class="text-emerald-600 text-lg">${puxadoLogistica} UN</b> será oficializado no WMS (Dashboard).</p>`,
+        icon: 'success',
+        showCancelButton: true,
+        confirmButtonColor: '#10b981',
+        cancelButtonColor: '#cbd5e1',
+        confirmButtonText: 'Sim, Finalizar',
+        cancelButtonText: 'Cancelar'
+      });
+
+      if (isConfirmed) {
+        Swal.fire({ title: 'Finalizando e Injetando...', didOpen: () => Swal.showLoading() });
+
+        await client.from('wms_planos_producao').update({ status: 'CONCLUIDO OK', fechado_por: 'Gestor Logística' }).eq('id', id);
+        
+        // Injeta o Saldo no WMS (Dashboard)
+        const hoje = new Date().toISOString().split('T')[0];
+        const { data: inv } = await client.from('inventario_pa').select('id, qtd_fisica').eq('data_inventario', hoje).eq('n_item', nItem).eq('lote', lote);
+        
+        if (inv && inv.length > 0) {
+          await client.from('inventario_pa').update({ qtd_fisica: parseFloat(inv[0].qtd_fisica) + puxadoLogistica }).eq('id', inv[0].id);
+        } else {
+          await client.from('inventario_pa').insert([{ data_inventario: hoje, n_item: nItem, lote: lote, data_fabricacao: dataFab, qtd_fisica: puxadoLogistica }]);
+        }
+
+        Swal.fire('Encerrado!', `FUP Concluído com Sucesso!`, 'success');
+        carregarFechamentos();
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; margin: 0; padding: 1.5rem; }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+    .card-modern { background: white; border-radius: 1rem; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out; }
+    .card-modern:hover { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04); transform: translateY(-2px); }
+    .badge-modern { padding: 4px 10px; border-radius: 6px; font-size: 0.65rem; font-weight: 800; display: inline-block; white-space: nowrap; text-transform: uppercase; letter-spacing: 0.05em; }
+    .glow-indigo { box-shadow: 0 4px 14px 0 rgba(99, 102, 241, 0.25); }
+    .glow-blue { box-shadow: 0 4px 14px 0 rgba(59, 130, 246, 0.25); }
+    .glow-amber { box-shadow: 0 4px 14px 0 rgba(245, 158, 11, 0.25); }
+    .glow-emerald { box-shadow: 0 4px 14px 0 rgba(16, 185, 129, 0.25); }
+    .glow-cyan { box-shadow: 0 4px 14px 0 rgba(6, 182, 212, 0.25); }
+    .glow-purple { box-shadow: 0 4px 14px 0 rgba(168, 85, 247, 0.25); }
+  </style>
+</head>
+<body>
+
+  <div class="max-w-[1600px] mx-auto flex flex-col gap-6 pb-10">
+    
+    <!-- HEADER -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 card-modern p-5 border-t-4 border-t-[#001A70]">
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center text-xl glow-blue">
+          <i class="fa-solid fa-chart-pie"></i>
+        </div>
+        <div>
+          <h1 class="text-2xl font-black text-slate-800 tracking-tight">Visão Geral P.A.</h1>
+          <p class="text-slate-500 font-bold text-xs tracking-wide">Controle e Produtividade de Inventário</p>
+        </div>
+      </div>
+      <div class="flex flex-wrap items-center gap-3">
+        <button onclick="exportarInventarioGeralXLSX()" class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-4 py-2.5 rounded-lg font-bold text-xs flex items-center gap-2 transition-colors shadow-sm">
+          <i class="fa-solid fa-file-excel text-emerald-500 text-base"></i> Exportar Dados
+        </button>
+        <div class="flex items-center gap-2 bg-white border border-slate-200 px-4 py-2.5 rounded-lg shadow-sm">
+          <i class="fa-regular fa-calendar text-slate-400"></i>
+          <input type="date" id="filtroDataDash" class="text-xs font-bold text-slate-700 border-none outline-none bg-transparent cursor-pointer focus:ring-0" onchange="carregarDadosDashboard()">
+        </div>
+      </div>
+    </div>
+
+    <!-- KPIS -->
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-5">
+      <div class="card-modern p-5 flex items-center gap-4 border-t-[3px] border-t-indigo-400">
+        <div class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-500 flex items-center justify-center text-xl glow-indigo"><i class="fa-solid fa-boxes-stacked"></i></div>
+        <div><p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Lotes</p><h3 class="text-2xl font-black text-slate-800 leading-none" id="kpi-lotes">0</h3><p class="text-[9px] font-bold text-slate-400 mt-1">Total registrados</p></div>
+      </div>
+      <div class="card-modern p-5 flex items-center gap-4 border-t-[3px] border-t-blue-400">
+        <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-500 flex items-center justify-center text-xl glow-blue"><i class="fa-solid fa-box-open"></i></div>
+        <div><p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Físico Total</p><h3 class="text-2xl font-black text-slate-800 leading-none" id="kpi-qtd">0</h3><p class="text-[9px] font-bold text-slate-400 mt-1">Unidades</p></div>
+      </div>
+      <div class="card-modern p-5 flex items-center gap-4 border-t-[3px] border-t-amber-400">
+        <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center text-xl glow-amber"><i class="fa-solid fa-truck"></i></div>
+        <div><p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Carretas</p><h3 class="text-2xl font-black text-slate-800 leading-none" id="kpi-carretas">0.0</h3><p class="text-[9px] font-bold text-slate-400 mt-1">Em andamento</p></div>
+      </div>
+      <div class="card-modern p-5 flex items-center gap-4 border-t-[3px] border-t-emerald-400">
+        <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-500 flex items-center justify-center text-xl glow-emerald"><i class="fa-solid fa-pallet"></i></div>
+        <div><p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Paletes (Dia)</p><h3 class="text-2xl font-black text-slate-800 leading-none" id="res-paletes">0</h3><p class="text-[9px] font-bold text-slate-400 mt-1">Total estimado</p></div>
+      </div>
+      <div class="card-modern p-5 flex items-center gap-4 border-t-[3px] border-t-cyan-400 cursor-pointer" onclick="verLoteNovo()">
+        <div class="w-12 h-12 rounded-xl bg-cyan-50 text-cyan-500 flex items-center justify-center text-xl glow-cyan"><i class="fa-solid fa-arrow-rotate-right"></i></div>
+        <div class="overflow-hidden">
+          <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Lote Recente</p>
+          <h3 class="text-lg font-black text-slate-800 leading-tight truncate" id="kpi-lote-novo">--</h3>
+          <p class="text-[9px] font-bold text-cyan-600 mt-1" id="kpi-data-novo">--</p>
+        </div>
+      </div>
+      <div class="card-modern p-5 flex items-center gap-4 border-t-[3px] border-t-purple-400 cursor-pointer" onclick="verLoteAntigo()">
+        <div class="w-12 h-12 rounded-xl bg-purple-50 text-purple-500 flex items-center justify-center text-xl glow-purple"><i class="fa-solid fa-hourglass-half"></i></div>
+        <div class="overflow-hidden">
+          <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Lote Antigo</p>
+          <h3 class="text-lg font-black text-slate-800 leading-tight truncate" id="kpi-lote-antigo">--</h3>
+          <p class="text-[9px] font-bold text-purple-600 mt-1" id="kpi-data-antigo">--</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- O NOVO BARRA DE OCUPAÇÃO NO MEIO DO DASHBOARD -->
+    <div class="card-modern p-6 flex flex-col justify-center relative overflow-hidden bg-white border-x-4 border-x-blue-500">
+      <div class="flex justify-between items-end mb-2">
+        <div>
+          <h3 class="text-sm font-black text-slate-700 uppercase tracking-widest flex items-center gap-2"><i class="fa-solid fa-warehouse text-blue-500"></i> Ocupação do Armazém</h3>
+          <p class="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">Capacidade Total WMS: <span class="text-slate-600">890 Posições</span></p>
+        </div>
+        <div class="text-right">
+          <span class="text-3xl font-black text-blue-600 tracking-tighter" id="kpi-ocupacao-pct">0%</span>
+        </div>
+      </div>
+      <!-- Barra de Progresso Fundo -->
+      <div class="w-full bg-slate-100 rounded-full h-5 mt-2 overflow-hidden border border-slate-200 shadow-inner">
+        <!-- Barra de Progresso Preenchimento -->
+        <div id="barra-ocupacao" class="bg-gradient-to-r from-blue-400 to-blue-600 h-5 rounded-full transition-all duration-1000 ease-out" style="width: 0%"></div>
+      </div>
+      <div class="flex justify-between text-[10px] font-bold text-slate-500 mt-3 uppercase tracking-widest">
+        <span id="kpi-ocupacao-paletes"><i class="fa-solid fa-pallet mr-1"></i> 0 Paletes em Estoque</span>
+        <span id="kpi-ocupacao-livres" class="text-emerald-500"><i class="fa-solid fa-check mr-1"></i> 890 Livres</span>
+      </div>
+    </div>
+
+    <!-- GRÁFICOS & BACKLOG -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div class="card-modern p-6 h-[320px] flex flex-col">
+        <h3 class="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2"><i class="fa-solid fa-chart-line text-blue-500"></i> Curva de Fabricação</h3>
+        <div class="flex-grow relative w-full h-full"><canvas id="chartLine"></canvas></div>
+      </div>
+      
+      <div class="card-modern p-6 h-[320px] flex flex-col relative">
+        <h3 class="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2"><i class="fa-solid fa-chart-pie text-indigo-500"></i> Distribuição D's</h3>
+        <div class="flex-grow relative w-full h-full flex justify-center items-center"><canvas id="chartDonut"></canvas></div>
+      </div>
+      
+      <div class="flex flex-col gap-5 h-[320px]">
+        <div class="card-modern p-5 flex-grow relative flex flex-col">
+          <h3 class="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-2"><i class="fa-solid fa-list-ul text-cyan-500"></i> Top Volumes (Lote)</h3>
+          <div class="flex-grow relative w-full"><canvas id="chartBar"></canvas></div>
+        </div>
+        <div class="bg-red-50 border border-red-100 shadow-sm rounded-2xl p-5 flex items-center justify-between cursor-pointer hover:shadow-md transition-all group relative overflow-hidden" onclick="verBacklog()">
+          <i class="fa-solid fa-triangle-exclamation absolute -right-2 -bottom-4 text-7xl text-red-500 opacity-5 group-hover:scale-110 transition-transform"></i>
+          <div class="relative z-10">
+            <h3 class="text-sm font-black text-red-600 flex items-center gap-2"><i class="fa-solid fa-triangle-exclamation"></i> Backlog (D3+)</h3>
+            <p class="text-[10px] font-bold text-red-400 uppercase tracking-wide mt-1">Atrasos de Fábrica</p>
+          </div>
+          <span class="text-4xl font-black text-red-600 relative z-10" id="res-backlog">0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- TABELA ELEGANTE -->
+    <div class="card-modern bg-white overflow-hidden pb-2">
+      <div class="bg-white border-b border-slate-100 p-5 flex justify-between items-center">
+        <h3 class="text-[11px] font-black text-slate-600 uppercase tracking-widest flex items-center gap-2"><i class="fa-solid fa-table-cells-large text-blue-500"></i> Detalhamento Inventário (Por Dia)</h3>
+      </div>
+      <div class="max-h-[400px] overflow-y-auto custom-scrollbar">
+        <table class="w-full text-left min-w-[1000px] border-collapse">
+          <thead class="bg-slate-100 sticky top-0 z-10">
+            <tr>
+              <th class="p-3 pl-5 text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-200">Item</th>
+              <th class="p-3 text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-200">Descrição</th>
+              <th class="p-3 text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-200 text-center">Físico</th>
+              <th class="p-3 text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-200 text-center">Lote</th>
+              <th class="p-3 text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-200 text-center">Data Fab.</th>
+              <th class="p-3 text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-200 text-center">D's Fab</th>
+              <th class="p-3 text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-200 text-center">D's O.P.</th>
+              <th class="p-3 text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-200 text-center">Status OP</th>
+              <th class="p-3 text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-200 text-center">Paletes</th>
+              <th class="p-3 pr-5 text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-200 text-right">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tabelaCorpoDash" class="divide-y divide-slate-100">
+            <tr><td colspan="10" class="text-center py-10 font-bold text-slate-400">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const client = window.supabase.createClient('https://cbrwmscaidyeaamyfiyt.supabase.co', 'sb_publishable_neiGbVa2X1nBfX5wT3UGYw_3RWe43_G');
+    try { if(typeof Chart !== 'undefined' && typeof ChartDataLabels !== 'undefined') Chart.register(ChartDataLabels); } catch(e){}
+
+    let chart1, chart2, chart3, dadosParaExcelDash = [];
+    let itemLoteAntigo = null, itemLoteNovo = null, itensBacklog = [];
+
+    document.getElementById('filtroDataDash').value = new Date().toISOString().split('T')[0];
+    carregarDadosDashboard();
+
+    async function carregarDadosDashboard() {
+      Swal.fire({ title: 'Sincronizando Dados...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); }});
+      const dataSelecionada = document.getElementById('filtroDataDash').value;
+      
+      try {
+        // 1. CARREGA INVENTÁRIO GERAL (Tabela do dia)
+        const { data: invData, error: invError } = await client.from('inventario_pa').select('*').eq('data_inventario', dataSelecionada);
+        if (invError) throw invError;
+
+        // 2. CARREGA OCUPAÇÃO DO ARMAZÉM (Total de Paletes no WMS)
+        const { count, error: errCount } = await client.from('wms_paletes').select('*', { count: 'exact', head: true });
+        atualizarOcupacaoArmazem(count || 0);
+
+        const { data: prodData } = await client.from('produtos_moove').select('*');
+        let dictProd = {}; if (prodData) prodData.forEach(p => dictProd[p.n_item] = p);
+
+        const { data: ctrlData } = await client.from('controle_op').select('*');
+        let mapaCtrl = {}; if (ctrlData) ctrlData.forEach(c => { mapaCtrl[`${c.n_item}_${c.lote}`] = c; });
+
+        const { data: cargasData } = await client.from('cargas_roteirizadas').select('*');
+        let mapaRot = {}; if (cargasData) cargasData.forEach(c => { let k = `${c.n_item}_${c.lote}`; mapaRot[k] = (mapaRot[k] || 0) + parseFloat(c.qtd_solicitada || 0); });
+
+        const hoje = new Date(); hoje.setHours(0,0,0,0);
+        let totalQtd = 0, totalPaletesValidos = 0, paletesBacklog = 0; 
+        
+        let dataAgrupadaLine = {}; 
+        let qtdPorDs = {}, lotesMap = {};
+        let htmlTable = ''; 
+        dadosParaExcelDash = []; itensBacklog = [];
+        itemLoteAntigo = null; itemLoteNovo = null;
+
+        if (!invData || invData.length === 0) {
+          document.getElementById('tabelaCorpoDash').innerHTML = '<tr><td colspan="10" class="text-center py-10 font-bold text-slate-400">Nenhum inventário registrado nesta data.</td></tr>';
+          zerarKPIsDash(); Swal.close(); return;
+        }
+
+        invData.forEach(d => {
+          let nItem = d.n_item; 
+          let prod = dictProd[nItem] || { descricao: 'S/ CADASTRO', cod_moove: 'N/A', cod_pax: 'N/A', qtd_palete: 0, cliente: 'S/ CLIENTE', peso: 0 };
+          let desc = prod.descricao; let lote = d.lote; let qtdFisica = parseFloat(d.qtd_fisica) || 0; let dataFab = d.data_fabricacao; let capPalete = parseFloat(prod.qtd_palete) || 0;
+          totalQtd += qtdFisica;
+          
+          let paletes = "Sem Cad."; if (capPalete > 0) { paletes = Math.ceil(qtdFisica / capPalete); totalPaletesValidos += paletes; }
+          let qtdLivre = qtdFisica;
+
+          let dStr = "D-"; let dias = 0; let tsFab = 0; let dtFormatada = "-";
+          if (dataFab) {
+            let parts = dataFab.split('-'); let dtObj = new Date(parts[0], parts[1]-1, parts[2]); let diffTime = hoje.getTime() - dtObj.getTime();
+            dias = Math.floor(diffTime / (1000 * 3600 * 24)); dStr = "D" + (dias >= 0 ? dias : 0); dtFormatada = `${parts[2]}/${parts[1]}/${parts[0]}`; tsFab = dtObj.getTime();
+          }
+
+          let infoCtrl = mapaCtrl[`${nItem}_${lote}`]; let statusExpedicao = infoCtrl ? (infoCtrl.status_expedicao || 'AGUARDANDO') : "AGUARDANDO"; let diasCtrl = -1; let dsCtrlStr = "S/ OP";
+          if (infoCtrl && infoCtrl.data_op) { try { let opDt = new Date(infoCtrl.data_op); opDt.setHours(0,0,0,0); let diff = hoje.getTime() - opDt.getTime(); diasCtrl = Math.floor(diff / (1000 * 3600 * 24)); dsCtrlStr = "D" + (diasCtrl >= 0 ? diasCtrl : 0); } catch(e){} }
+
+          let dCompleto = { id: d.id, nItem: nItem, desc: desc, lote: lote, dataFabStr: dtFormatada, dataGrafico: dtFormatada, dataFabTimestamp: tsFab, qtd: qtdFisica, qtdLivre: qtdLivre, ds: dStr, diasInt: dias, paletes: paletes, fatorPalete: capPalete, statusExpedicao: statusExpedicao, dsCtrl: dsCtrlStr, diasCtrl: diasCtrl, cliente: prod.cliente, pesoTotal: (qtdFisica * (prod.peso||0)), moove: prod.cod_moove, pax: prod.cod_pax };
+          dadosParaExcelDash.push(dCompleto);
+
+          let dsFabClass = dias <= 2 ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-rose-50 text-rose-600 border-rose-200'; 
+          let dsCtrlClass = 'bg-slate-50 text-slate-500 border-slate-200'; if (diasCtrl >= 0) dsCtrlClass = diasCtrl <= 2 ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-rose-50 text-rose-600 border-rose-200';
+          let corStatus = statusExpedicao === "LIBERADO" ? "bg-emerald-50 text-emerald-600 border-emerald-200" : (statusExpedicao === "AGUARDANDO" ? "bg-slate-50 text-slate-500 border-slate-200" : "bg-red-50 text-red-600 border-red-200");
+
+          htmlTable += `
+            <tr class="hover:bg-blue-50/40 transition-colors group">
+              <td class="p-3 pl-5"><span class="font-bold text-slate-700 text-[11px] bg-white border border-slate-200 shadow-sm px-2 py-1 rounded">${nItem}</span></td>
+              <td class="p-3 text-[11px] font-bold text-slate-500 truncate max-w-[200px]" title="${desc}">${desc}</td>
+              <td class="p-3 text-center"><span class="font-black text-blue-600 text-sm">${qtdFisica}</span></td>
+              <td class="p-3 text-center text-[11px] font-bold text-slate-700">${lote}</td>
+              <td class="p-3 text-center text-[10px] text-slate-400 font-medium">${dtFormatada}</td>
+              <td class="p-3 text-center"><span class="badge-modern ${dsFabClass}">${dStr}</span></td>
+              <td class="p-3 text-center"><span class="badge-modern ${dsCtrlClass}">${dsCtrlStr}</span></td>
+              <td class="p-3 text-center"><span class="badge-modern ${corStatus}">${statusExpedicao}</span></td>
+              <td class="p-3 text-center font-bold text-slate-600 text-xs">${paletes}</td>
+              <td class="p-3 text-right pr-5"><button onclick="solicitarExclusaoInventario(${d.id}, '${lote}')" class="text-slate-300 hover:text-red-500 transition-colors" title="Excluir"><i class="fa-solid fa-trash-can"></i></button></td>
+            </tr>
+          `;
+
+          if (dias >= 3 && paletes !== "Sem Cad.") { paletesBacklog += paletes; itensBacklog.push(dCompleto); }
+          
+          if (tsFab > 0) { 
+            if (!itemLoteAntigo || tsFab < itemLoteAntigo.dataFabTimestamp) itemLoteAntigo = dCompleto; 
+            if (!itemLoteNovo || tsFab > itemLoteNovo.dataFabTimestamp) itemLoteNovo = dCompleto; 
+          }
+          
+          if (dataFab) { dataAgrupadaLine[dataFab] = (dataAgrupadaLine[dataFab] || 0) + qtdFisica; }
+          qtdPorDs[dStr] = (qtdPorDs[dStr] || 0) + qtdFisica; 
+          lotesMap[lote] = (lotesMap[lote] || 0) + qtdFisica;
+        });
+
+        document.getElementById('tabelaCorpoDash').innerHTML = htmlTable;
+        document.getElementById('kpi-lotes').innerText = invData.length; 
+        document.getElementById('kpi-qtd').innerText = totalQtd.toLocaleString('pt-BR'); 
+        document.getElementById('kpi-carretas').innerText = (totalPaletesValidos / 34).toFixed(1); 
+        document.getElementById('res-paletes').innerText = totalPaletesValidos; 
+        document.getElementById('res-backlog').innerText = paletesBacklog; 
+        document.getElementById('kpi-lote-novo').innerText = itemLoteNovo ? itemLoteNovo.lote : "--"; 
+        document.getElementById('kpi-data-novo').innerText = itemLoteNovo ? itemLoteNovo.dataGrafico : "--";
+        document.getElementById('kpi-lote-antigo').innerText = itemLoteAntigo ? itemLoteAntigo.lote : "--"; 
+        document.getElementById('kpi-data-antigo').innerText = itemLoteAntigo ? itemLoteAntigo.dataGrafico : "--";
+        
+        try { renderGraficos(dataAgrupadaLine, qtdPorDs, lotesMap); } catch (e) { console.warn(e); }
+        Swal.close();
+      } catch(err) { Swal.fire('Erro', err.message || 'Falha ao processar.', 'error'); }
+    }
+
+    // Função Exclusiva para Atualizar a Ocupação
+    function atualizarOcupacaoArmazem(totalPaletesWMS) {
+      const capacidadeMaxima = 890;
+      let percentual = ((totalPaletesWMS / capacidadeMaxima) * 100).toFixed(1);
+      if (percentual > 100) percentual = 100; // Evita estourar a barra visualmente
+
+      const barra = document.getElementById('barra-ocupacao');
+      const pctTexto = document.getElementById('kpi-ocupacao-pct');
+      
+      document.getElementById('kpi-ocupacao-paletes').innerHTML = `<i class="fa-solid fa-pallet mr-1"></i> ${totalPaletesWMS} Paletes no WMS`;
+      document.getElementById('kpi-ocupacao-livres').innerHTML = `<i class="fa-solid fa-check mr-1"></i> ${capacidadeMaxima - totalPaletesWMS} Posições Livres`;
+
+      pctTexto.innerText = `${percentual}%`;
+      barra.style.width = `${percentual}%`;
+
+      // Se chegar perto da lotação, a barra e o texto mudam para laranja/vermelho
+      if (percentual >= 90) {
+        barra.classList.replace('from-blue-400', 'from-red-400');
+        barra.classList.replace('to-blue-600', 'to-red-600');
+        pctTexto.classList.replace('text-blue-600', 'text-red-600');
+      } else if (percentual >= 75) {
+        barra.classList.replace('from-blue-400', 'from-amber-400');
+        barra.classList.replace('to-blue-600', 'to-amber-600');
+        pctTexto.classList.replace('text-blue-600', 'text-amber-600');
+      } else {
+        // Volta pro azul se baixar
+        barra.classList.remove('from-red-400', 'to-red-600', 'from-amber-400', 'to-amber-600');
+        barra.classList.add('from-blue-400', 'to-blue-600');
+        pctTexto.classList.remove('text-red-600', 'text-amber-600');
+        pctTexto.classList.add('text-blue-600');
+      }
+    }
+
+    function zerarKPIsDash() { 
+      document.getElementById('kpi-lotes').innerText = "0"; document.getElementById('kpi-qtd').innerText = "0"; document.getElementById('kpi-carretas').innerText = "0.0"; document.getElementById('kpi-lote-novo').innerText = "--"; document.getElementById('kpi-data-novo').innerText = "--"; document.getElementById('kpi-lote-antigo').innerText = "--"; document.getElementById('kpi-data-antigo').innerText = "--"; document.getElementById('res-paletes').innerText = "0"; document.getElementById('res-backlog').innerText = "0"; 
+      if(chart1) chart1.destroy(); if(chart2) chart2.destroy(); if(chart3) chart3.destroy(); 
+    }
+
+    function renderGraficos(dataAgrupadaLine, qtdPorDs, lotesMap) {
+      if(chart1) chart1.destroy(); if(chart2) chart2.destroy(); if(chart3) chart3.destroy();
+      if (typeof Chart === 'undefined') return;
+      Chart.defaults.font.family = 'Inter'; Chart.defaults.color = '#64748b';
+      
+      const sortedDates = Object.keys(dataAgrupadaLine).sort();
+      const labelsLine = sortedDates.map(d => { let p = d.split('-'); return `${p[2]}/${p[1]}`; }); 
+      const dataLine = sortedDates.map(d => dataAgrupadaLine[d]);
+
+      const ctxLine = document.getElementById('chartLine').getContext('2d');
+      const gradientLine = ctxLine.createLinearGradient(0, 0, 0, 300);
+      gradientLine.addColorStop(0, 'rgba(59, 130, 246, 0.4)'); 
+      gradientLine.addColorStop(1, 'rgba(59, 130, 246, 0)');
+
+      chart1 = new Chart(ctxLine, { 
+        type: 'line', 
+        data: { labels: labelsLine, datasets: [{ data: dataLine, borderColor: '#3b82f6', backgroundColor: gradientLine, fill: true, tension: 0.4, borderWidth: 3, pointRadius: 4, pointBackgroundColor: '#ffffff', pointBorderColor: '#3b82f6', pointBorderWidth: 2 }] }, 
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, datalabels: { display: false } }, scales: { x: { grid: { display: false }, border: {display: false}, ticks: {font: {weight: 'bold', size: 10}} }, y: { display: false, min: 0 } } } 
+      });
+      
+      const paletaCores = ['#3b82f6', '#0ea5e9', '#6366f1', '#10b981', '#f59e0b', '#f43f5e']; 
+      const dsLabels = Object.keys(qtdPorDs).sort(); 
+      
+      const centerTextPlugin = {
+        id: 'centerTextPlugin',
+        beforeDraw: function(chart) {
+          if (chart.config.type !== 'doughnut') return;
+          var ctx = chart.ctx;
+          var chartArea = chart.chartArea;
+          var centerX = chartArea.left + (chartArea.width / 2);
+          var centerY = chartArea.top + (chartArea.height / 2);
+
+          ctx.restore();
+          var fontSize = (chartArea.height / 120).toFixed(2);
+          ctx.font = "900 " + fontSize + "em Inter";
+          ctx.textBaseline = "middle";
+          ctx.textAlign = "center";
+          ctx.fillStyle = "#1e293b";
+          var total = chart.data.datasets[0].data.reduce((a,b)=>a+b,0);
+          ctx.fillText(total.toLocaleString('pt-BR'), centerX, centerY - (chartArea.height * 0.05));
+          
+          ctx.font = "700 " + (fontSize/3.5).toFixed(2) + "em Inter";
+          ctx.fillStyle = "#94a3b8";
+          ctx.fillText("Total", centerX, centerY + (chartArea.height * 0.12));
+          ctx.save();
+        }
+      };
+
+      chart2 = new Chart(document.getElementById('chartDonut'), { 
+        type: 'doughnut', 
+        data: { labels: dsLabels, datasets: [{ data: dsLabels.map(k => qtdPorDs[k]), backgroundColor: dsLabels.map((_, i) => paletaCores[i % paletaCores.length]), borderWidth: 0, cutout: '80%' }] }, 
+        options: { responsive: true, maintainAspectRatio: false, layout: { padding: 10 }, plugins: { legend: { position: 'right', labels: { usePointStyle: true, padding: 15, font: { size: 11, weight: '700' } } }, datalabels: { display: false } } },
+        plugins: [centerTextPlugin]
+      });
+      
+      const lotesOrdenados = Object.keys(lotesMap).sort((a,b) => lotesMap[b] - lotesMap[a]).slice(0, 6); 
+      chart3 = new Chart(document.getElementById('chartBar'), { 
+        type: 'bar', 
+        data: { labels: lotesOrdenados, datasets: [{ data: lotesOrdenados.map(k => lotesMap[k]), backgroundColor: '#3b82f6', borderRadius: 4, barThickness: 12 }] }, 
+        options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, datalabels: { anchor: 'end', align: 'right', color: '#64748b', font: { weight: '800', size: 10 } } }, scales: { x: { display: false }, y: { grid: { display: false }, border: { display: false }, ticks: { font: { weight: '700', size: 10 } } } } } 
+      });
+    }
+
+    function solicitarExclusaoInventario(id, lote) { Swal.fire({ title: 'Apagar Registro?', text: `Apagar contagem do Lote ${lote}?`, icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'Sim' }).then(async (res) => { if (res.isConfirmed) { await client.from('inventario_pa').delete().eq('id', id); Swal.fire({ title: 'Apagado!', icon: 'success', timer: 1000, showConfirmButton: false }); carregarDadosDashboard(); } }); }
+    function verLoteAntigo() { if(!itemLoteAntigo) return; Swal.fire({ title: 'Lote Antigo', html: `<div class="text-left bg-slate-50 p-4 rounded-xl text-sm border border-slate-200"><b>Código:</b> ${itemLoteAntigo.nItem}<br><b>Lote:</b> ${itemLoteAntigo.lote}<br><b>Data Fab:</b> ${itemLoteAntigo.dataGrafico}<br><b>L.T.:</b> ${itemLoteAntigo.ds}<br><b>Físico:</b> ${itemLoteAntigo.qtd} UN</div>`, confirmButtonColor: '#3b82f6' }); }
+    function verLoteNovo() { if(!itemLoteNovo) return; Swal.fire({ title: 'Lote Recente', html: `<div class="text-left bg-slate-50 p-4 rounded-xl text-sm border border-slate-200"><b>Código:</b> ${itemLoteNovo.nItem}<br><b>Lote:</b> ${itemLoteNovo.lote}<br><b>Data Fab:</b> ${itemLoteNovo.dataGrafico}<br><b>Físico:</b> ${itemLoteNovo.qtd} UN</div>`, confirmButtonColor: '#3b82f6' }); }
+    function verBacklog() { if(itensBacklog.length === 0) return Swal.fire('Tudo em Dia!', 'Nenhum lote D3+ parado.', 'success'); let html = `<div class="max-h-[300px] overflow-y-auto text-left text-xs bg-slate-50 border border-slate-200 rounded-xl p-3"><ul class="list-disc pl-4 space-y-2">`; itensBacklog.forEach(i => { html += `<li><b class="text-blue-700">${i.nItem}</b> (Lote ${i.lote}) - Fab: ${i.ds} | OP: ${i.dsCtrl} - ${i.qtd} UN</li>`; }); html += `</ul></div>`; Swal.fire({ title: 'Backlog (D3+)', html: html, icon: 'warning', confirmButtonColor: '#ef4444' }); }
+
+    function exportarInventarioGeralXLSX() {
+      if (dadosParaExcelDash.length === 0) return Swal.fire('Atenção', 'Não há dados para exportar.', 'warning');
+      const cabecalhos = ["Nº do item", "Descrição", "Moove", "Pax", "Lote", "Data Fab", "Físico", "Paletes", "Status OP", "D's Fab", "D's OP", "Cliente", "Peso Estimado"];
+      const linhas = [cabecalhos]; dadosParaExcelDash.forEach(r => { linhas.push([r.nItem, r.desc, r.moove, r.pax, r.lote, r.dataFabStr, r.qtd, r.paletes, r.statusExpedicao, r.ds, r.dsCtrl, r.cliente, r.pesoTotal]); });
+      const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(linhas), "Inventario"); XLSX.writeFile(wb, `Inventario_${document.getElementById('filtroDataDash').value}.xlsx`);
+    }
+  </script>
+</body>
+</html>

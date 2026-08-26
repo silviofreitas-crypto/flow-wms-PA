@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; padding: 1.5rem; margin: 0; }
+    .card-modern { background: white; border-radius: 1.25rem; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+    .badge-modern { padding: 4px 10px; border-radius: 6px; font-size: 0.65rem; font-weight: 800; display: inline-block; white-space: nowrap; text-transform: uppercase; letter-spacing: 0.05em; }
+    .input-modern { width: 100%; background-color: #f8fafc; border: 2px solid #e2e8f0; color: #1e293b; font-weight: 700; border-radius: 0.75rem; padding: 0.75rem 1rem; outline: none; transition: all 0.2s; }
+    .input-modern:focus { background-color: #ffffff; border-color: #3b82f6; }
+  </style>
+</head>
+<body>
+  <div class="max-w-[1400px] mx-auto flex flex-col gap-6 h-[85vh]">
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 card-modern p-6 shrink-0 border-t-4 border-t-[#00B5E2]">
+      <div class="flex items-center gap-4">
+        <div class="w-14 h-14 bg-cyan-50 text-cyan-500 rounded-2xl flex items-center justify-center text-2xl border border-cyan-100 shadow-sm"><i class="fa-solid fa-map-location-dot"></i></div>
+        <div><h1 class="text-3xl font-black text-slate-800 tracking-tight">Mapa de Estoque</h1><p class="text-slate-500 font-bold text-sm">Visão detalhada e Ajustes</p></div>
+      </div>
+      <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
+        <button onclick="novaEntradaManual()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-xl font-black text-xs shadow-md transition-colors active:scale-95"><i class="fa-solid fa-plus mr-1"></i> Entrada Manual</button>
+        <div class="relative flex-grow md:flex-grow-0 md:w-80">
+          <i class="fa-solid fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+          <input type="text" id="buscaEstoque" onkeyup="filtrarEstoque()" class="input-modern pl-11 text-sm" placeholder="Buscar Lote, Item ou Endereço...">
+        </div>
+        <button onclick="carregarEstoque()" class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-5 py-3 rounded-xl font-bold text-sm shadow-sm transition-colors active:scale-95"><i class="fa-solid fa-rotate-right text-cyan-500"></i></button>
+      </div>
+    </div>
+
+    <div class="card-modern overflow-hidden flex-1 flex flex-col">
+      <div class="bg-white border-b border-slate-100 p-5 shrink-0 flex justify-between items-center"><h3 class="text-[11px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2"><i class="fa-solid fa-layer-group text-blue-500"></i> Rastreabilidade de Paletes (SSCC)</h3><p class="text-[10px] font-bold text-slate-400" id="contadorPaletes">0 paletes encontrados</p></div>
+      <div class="flex-1 overflow-y-auto custom-scrollbar">
+        <table class="w-full text-left min-w-[1200px]">
+          <thead class="bg-slate-50 sticky top-0 z-10 shadow-sm">
+            <tr>
+              <th class="p-4 pl-6 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 w-[15%]">Palete ID</th>
+              <th class="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 w-[12%]">Item</th>
+              <th class="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 w-[20%]">Descrição</th>
+              <th class="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 text-center w-[12%]">Lote</th>
+              <th class="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 text-center w-[10%]">Qtd Físico</th>
+              <th class="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 text-center w-[10%]">Status</th>
+              <th class="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 text-center w-[11%]">Endereço</th>
+              <th class="p-4 pr-6 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 text-right w-[10%]">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tabelaEstoque" class="divide-y divide-slate-100">
+            <tr><td colspan="8" class="text-center py-10 font-bold text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const client = window.supabase.createClient('https://cbrwmscaidyeaamyfiyt.supabase.co', 'sb_publishable_neiGbVa2X1nBfX5wT3UGYw_3RWe43_G');
+    let dadosCompletosEstoque = []; let produtosGlobais = {};
+
+    window.onload = () => carregarEstoque();
+
+    async function carregarEstoque() {
+      const tb = document.getElementById('tabelaEstoque');
+      tb.innerHTML = '<tr><td colspan="8" class="text-center py-10 font-bold text-slate-400"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Buscando posições...</td></tr>';
+      
+      const { data: prods } = await client.from('produtos_moove').select('n_item, descricao');
+      if (prods) prods.forEach(p => produtosGlobais[p.n_item] = p.descricao);
+
+      const { data, error } = await client.from('wms_paletes').select('*').order('id', { ascending: false });
+      if (error || !data || data.length === 0) {
+        tb.innerHTML = '<tr><td colspan="8" class="text-center py-16 font-bold text-slate-400 text-lg">Estoque vazio.</td></tr>';
+        document.getElementById('contadorPaletes').innerText = `0 paletes encontrados`;
+        return;
+      }
+      dadosCompletosEstoque = data;
+      renderizarTabela(dadosCompletosEstoque);
+    }
+
+    function renderizarTabela(dados) {
+      const tb = document.getElementById('tabelaEstoque');
+      document.getElementById('contadorPaletes').innerText = `${dados.length} paletes no sistema`;
+      if (dados.length === 0) return tb.innerHTML = '<tr><td colspan="8" class="text-center py-10 font-bold text-slate-400">Nenhum palete corresponde à busca.</td></tr>';
+
+      let html = '';
+      dados.forEach(d => {
+        let desc = produtosGlobais[d.n_item] || 'S/ DESCRIÇÃO';
+        let statusBadge = d.status === 'TRANSICAO' ? '<span class="badge-modern bg-amber-50 text-amber-600 border-amber-200">AG. PUTAWAY</span>' : '<span class="badge-modern bg-emerald-50 text-emerald-600 border-emerald-200">ARMAZENADO</span>';
+        let enderecoVisual = d.status === 'TRANSICAO' ? '<span class="text-slate-300 font-bold">--</span>' : `<span class="font-black text-slate-800 text-sm bg-slate-100 px-3 py-1 rounded-lg border border-slate-200">${d.endereco}</span>`;
+
+        html += `<tr class="hover:bg-slate-50/70 transition-colors group">
+          <td class="p-4 pl-6 text-xs font-black text-cyan-700">${d.codigo_palete}</td>
+          <td class="p-4"><span class="font-bold text-slate-600 text-[11px] bg-white border border-slate-200 shadow-sm px-2 py-1 rounded">${d.n_item}</span></td>
+          <td class="p-4 text-[10px] font-bold text-slate-500 truncate max-w-[200px]" title="${desc}">${desc}</td>
+          <td class="p-4 text-center text-[11px] font-black text-slate-700">${d.lote}</td>
+          <td class="p-4 text-center"><span class="font-black text-blue-600 text-sm">${d.qtd}</span><span class="text-[9px] text-slate-400 font-bold ml-1">UN</span></td>
+          <td class="p-4 text-center">${statusBadge}</td>
+          <td class="p-4 text-center">${enderecoVisual}</td>
+          <td class="p-4 pr-6 text-right"><button onclick="baixarPalete(${d.id}, '${d.codigo_palete}')" class="bg-red-50 hover:bg-red-500 text-red-500 hover:text-white px-3 py-2 rounded-lg text-xs font-bold transition-colors shadow-sm"><i class="fa-solid fa-trash-can"></i> Baixar</button></td>
+        </tr>`;
+      });
+      tb.innerHTML = html;
+    }
+
+    function filtrarEstoque() {
+      const termo = document.getElementById('buscaEstoque').value.toLowerCase();
+      const filtrados = dadosCompletosEstoque.filter(p => p.codigo_palete.toLowerCase().includes(termo) || p.n_item.toLowerCase().includes(termo) || p.lote.toLowerCase().includes(termo) || (p.endereco && p.endereco.toLowerCase().includes(termo)));
+      renderizarTabela(filtrados);
+    }
+
+    async function baixarPalete(id, codigoPalete) {
+      const { isConfirmed } = await Swal.fire({ title: 'Baixar Palete?', html: `Deseja remover o palete <b>${codigoPalete}</b> do estoque?`, icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Sim, Baixar' });
+      if (isConfirmed) {
+        Swal.fire({ title: 'Baixando...', didOpen: () => Swal.showLoading() });
+        await client.from('wms_paletes').delete().eq('id', id);
+        Swal.fire('Baixado!', 'Palete removido.', 'success');
+        carregarEstoque();
+      }
+    }
+
+    async function novaEntradaManual() {
+      // Pega planos ativos para vincular a entrada manual a um plano (assim a divergencia soma certo)
+      const { data: planos } = await client.from('wms_planos_producao').select('*').in('status', ['EM ANDAMENTO', 'AGUARDANDO FECHAMENTO']).order('id', {ascending:false});
+      
+      if (!planos || planos.length === 0) return Swal.fire('Atenção', 'Nenhum plano aberto na fábrica para vincular a entrada manual.', 'warning');
+      
+      let options = '';
+      planos.forEach(p => { options += `<option value="${p.id}">Plano #${p.id} - ${p.n_item} (Lote: ${p.lote})</option>`; });
+
+      const { value: formValues } = await Swal.fire({
+        title: 'Nova Entrada Manual',
+        html: `
+          <select id="swal-plano" class="w-full bg-slate-50 border-2 border-slate-200 text-slate-800 font-bold p-3 rounded-xl outline-none mb-3 text-sm">${options}</select>
+          <input id="swal-seq" type="number" class="w-full bg-slate-50 border-2 border-slate-200 text-slate-800 font-bold p-3 rounded-xl outline-none mb-3" placeholder="Sequencial Faltante (Seq)">
+          <input id="swal-qtd" type="number" class="w-full bg-slate-50 border-2 border-slate-200 text-slate-800 font-bold p-3 rounded-xl outline-none" placeholder="Quantidade Físico">
+        `,
+        focusConfirm: false,
+        showCancelButton: true,
+        confirmButtonColor: '#4f46e5',
+        confirmButtonText: 'Registrar Palete',
+        preConfirm: () => {
+          return { pid: document.getElementById('swal-plano').value, seq: document.getElementById('swal-seq').value, qtd: document.getElementById('swal-qtd').value }
+        }
+      });
+
+      if (formValues && formValues.pid && formValues.seq && formValues.qtd) {
+        Swal.fire({title: 'Gravando...', didOpen:()=>Swal.showLoading()});
+        const plano = planos.find(p => p.id == formValues.pid);
+        const codPalete = `PLT-${plano.lote}-${formValues.seq}`;
+        const user = JSON.parse(localStorage.getItem('flowWmsUser')) || {nome:'Gestor'};
+
+        const {error} = await client.from('wms_paletes').insert([{
+          codigo_palete: codPalete, plano_id: plano.id, seq_producao: parseInt(formValues.seq),
+          n_item: plano.n_item, lote: plano.lote, qtd: parseFloat(formValues.qtd), status: 'TRANSICAO', recebido_por: user.nome + ' (Manual)'
+        }]);
+
+        if(error) {
+          if(error.code === '23505') Swal.fire('Duplicado!', `O Sequencial ${formValues.seq} já existe neste plano!`, 'error');
+          else Swal.fire('Erro', error.message, 'error');
+        } else {
+          Swal.fire('Sucesso!', `Palete adicionado como Aguardando Putaway.`, 'success');
+          carregarEstoque();
+        }
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel | FLOW WMS</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .sidebar-text { transition: opacity 0.2s; white-space: nowrap; }
+    .w-20 .sidebar-text { opacity: 0; display: none; }
+    .w-20 #userInitials { width: 2.5rem; height: 2.5rem; font-size: 1rem; }
+    .menu-btn { transition: all 0.2s ease; }
+    .menu-btn.ativo { background-color: #0055A5; color: white; box-shadow: 0 4px 6px -1px rgba(0, 85, 165, 0.4); }
+    
+    /* MÁGICA PARA SUMIR COM A BARRA DE ROLAGEM FEIA */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+  <!-- Configurações do App (PWA) -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#001A70">
+  <link rel="icon" type="image/png" href="icone-192.png">
+  <link rel="apple-touch-icon" href="icone-192.png">
+</head>
+<body class="bg-slate-50 h-screen w-full flex overflow-hidden relative">
+
+  <div id="sidebarOverlay" onclick="toggleMobileSidebar()" class="fixed inset-0 bg-slate-900/60 z-40 hidden md:hidden transition-opacity opacity-0 duration-300"></div>
+
+  <aside id="sidebar" class="w-64 bg-[#001A70] text-slate-300 h-full flex flex-col shrink-0 fixed md:relative z-50 transform -translate-x-full md:translate-x-0 transition-all duration-300 ease-in-out shadow-2xl md:shadow-none">
+    <div class="h-20 flex items-center px-6 bg-[#001250] justify-between md:justify-start">
+      <h1 class="text-xl font-black tracking-widest text-white sidebar-text">FLOW<span class="text-[#00B5E2] font-light">WMS</span></h1>
+      <i class="fa-solid fa-cubes text-[#00B5E2] text-2xl hidden md:hidden" id="miniLogo"></i>
+      <button onclick="toggleMobileSidebar()" class="md:hidden text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+    </div>
+    
+    <div class="flex flex-col items-center p-6 border-b border-blue-900 transition-all">
+      <div class="w-16 h-16 rounded-full bg-blue-800 text-white flex items-center justify-center text-xl font-black border-2 border-[#00B5E2] mb-3 transition-all" id="userInitials">--</div>
+      <p class="text-white font-bold text-sm text-center truncate w-full sidebar-text" id="userName">Usuário</p>
+      <p class="text-[#00B5E2] text-[10px] font-black uppercase tracking-widest mt-1 bg-blue-900/50 px-2 py-0.5 rounded sidebar-text" id="userRole">PERFIL</p>
+    </div>
+
+    <!-- Aplicamos o no-scrollbar aqui -->
+    <div class="px-3 py-6 flex-1 overflow-y-auto no-scrollbar">
+      <p class="text-[9px] font-bold text-blue-400/50 uppercase tracking-widest mb-3 px-3 sidebar-text">Módulos</p>
+      <nav id="menuDinamico" class="space-y-1.5"></nav>
+    </div>
+    
+    <div class="p-4 border-t border-blue-900 flex justify-center">
+      <button onclick="fazerLogout()" class="w-full flex items-center justify-center gap-3 px-2 py-2.5 rounded-lg font-bold text-sm text-slate-400 hover:bg-red-500 hover:text-white transition-colors" title="Sair do Sistema">
+        <i class="fa-solid fa-arrow-right-from-bracket w-5 text-center"></i> 
+        <span class="sidebar-text">Sair do Sistema</span>
+      </button>
+    </div>
+  </aside>
+
+  <div class="flex-1 flex flex-col h-full relative overflow-hidden">
+    <header class="h-20 bg-white border-b border-slate-200 flex items-center px-4 md:px-6 shrink-0 shadow-sm gap-4">
+      <button onclick="toggleDesktopSidebar()" class="hidden md:block text-slate-600 hover:text-[#0055A5] p-2.5 rounded-xl transition-colors bg-slate-50 border border-slate-200 shadow-sm active:scale-95">
+        <i class="fa-solid fa-bars-staggered text-xl"></i>
+      </button>
+      <button onclick="toggleMobileSidebar()" class="md:hidden text-slate-600 hover:text-[#0055A5] p-2.5 rounded-xl bg-slate-50 border border-slate-200 shadow-sm active:scale-95">
+        <i class="fa-solid fa-bars text-xl"></i>
+      </button>
+      
+      <h2 class="text-lg md:text-xl font-black text-slate-800 border-l-2 border-slate-200 pl-4 ml-2" id="titulo-pagina">Bem-vindo</h2>
+    </header>
+    <main class="flex-1 w-full h-full bg-[#f1f5f9] overflow-hidden">
+      <iframe id="frameTela" src="" class="w-full h-full border-none bg-transparent"></iframe>
+    </main>
+  </div>
+
+  <script>
+    const telasPermitidas = {
+      'DESENVOLVEDOR': ['dashboard', 'estoque', 'planos', 'puxada', 'armazenagem', 'divergencias', 'controladoria'],
+      'PRODUCAO': ['planos'],
+      'CONFERENTE': ['puxada'],
+      'OPERADOR': ['armazenagem'],
+      'LOGISTICA': ['dashboard', 'estoque', 'puxada', 'armazenagem'],
+      'CONTROLADORIA': ['controladoria']
+    };
+
+    const estruturaMenu = {
+      'dashboard': { icone: 'fa-chart-pie', texto: 'Dashboard P.A.', arquivo: 'dashboard.html' },
+      'estoque': { icone: 'fa-map-location-dot', texto: 'Consulta de Estoque', arquivo: 'estoque.html' },
+      'planos': { icone: 'fa-industry', texto: 'Planos de Envase', arquivo: 'planos.html' },
+      'puxada': { icone: 'fa-dolly', texto: 'Puxada de P.A.', arquivo: 'puxada.html' },
+      'armazenagem': { icone: 'fa-cubes-stacked', texto: 'Armazenagem', arquivo: 'armazenagem.html' },
+      'divergencias': { icone: 'fa-scale-balanced', texto: 'Divergências WMS', arquivo: 'divergencias.html' },
+      'controladoria': { icone: 'fa-file-signature', texto: 'Controladoria OP', arquivo: 'controladoria.html' }
+    };
+
+    window.onload = () => {
+      const user = JSON.parse(localStorage.getItem('flowWmsUser'));
+      if (!user) return window.location.href = 'index.html';
+
+      document.getElementById('userName').innerText = user.nome;
+      document.getElementById('userRole').innerText = user.perfil_acesso;
+      document.getElementById('userInitials').innerText = user.nome.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase();
+
+      montarMenu(user.perfil_acesso);
+    };
+
+    function montarMenu(perfil) {
+      const container = document.getElementById('menuDinamico');
+      const liberadas = telasPermitidas[perfil] || [];
+      
+      liberadas.forEach(tela => {
+        let btn = estruturaMenu[tela];
+        container.innerHTML += `
+          <button onclick="abrirTela('${btn.arquivo}', '${btn.texto}', this)" class="menu-btn w-full flex items-center justify-center md:justify-start gap-3 px-4 py-3.5 rounded-xl font-bold text-sm text-slate-400 hover:bg-[#0055A5]/20 hover:text-white" title="${btn.texto}">
+            <i class="fa-solid ${btn.icone} w-5 text-center text-lg"></i> 
+            <span class="sidebar-text text-left flex-1">${btn.texto}</span>
+          </button>`;
+      });
+
+      if(liberadas.length > 0) abrirTela(estruturaMenu[liberadas[0]].arquivo, estruturaMenu[liberadas[0]].texto, document.querySelector('.menu-btn'));
+    }
+
+    function abrirTela(arquivo, titulo, btnElement) {
+      document.getElementById('titulo-pagina').innerText = titulo;
+      document.getElementById('frameTela').src = arquivo;
+      
+      document.querySelectorAll('.menu-btn').forEach(b => {
+        b.classList.remove('ativo');
+        b.classList.add('text-slate-400');
+        b.classList.remove('text-white');
+      });
+      if(btnElement) {
+        btnElement.classList.add('ativo');
+        btnElement.classList.remove('text-slate-400');
+        btnElement.classList.add('text-white');
+      }
+
+      if (window.innerWidth < 768) toggleMobileSidebar(); 
+    }
+
+    function toggleDesktopSidebar() {
+      const sidebar = document.getElementById('sidebar');
+      const miniLogo = document.getElementById('miniLogo');
+      
+      if (sidebar.classList.contains('w-64')) {
+        sidebar.classList.remove('w-64');
+        sidebar.classList.add('w-20');
+        miniLogo.classList.replace('hidden', 'block');
+      } else {
+        sidebar.classList.remove('w-20');
+        sidebar.classList.add('w-64');
+        miniLogo.classList.replace('block', 'hidden');
+      }
+    }
+
+    function toggleMobileSidebar() {
+      const sidebar = document.getElementById('sidebar');
+      const overlay = document.getElementById('sidebarOverlay');
+      if (sidebar.classList.contains('-translate-x-full')) {
+        sidebar.classList.remove('-translate-x-full');
+        overlay.classList.remove('hidden');
+        setTimeout(() => overlay.classList.remove('opacity-0'), 10);
+      } else {
+        sidebar.classList.add('-translate-x-full');
+        overlay.classList.add('opacity-0');
+        setTimeout(() => overlay.classList.add('hidden'), 300);
+      }
+    }
+
+    function fazerLogout() { localStorage.removeItem('flowWmsUser'); window.location.href = 'index.html'; }
+  </script>
+</body>
+</html>

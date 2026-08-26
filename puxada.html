@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
+    .input-pda { width: 100%; background: #fff; border: 2px solid #cbd5e1; font-weight: 900; font-size: 2rem; text-align: center; border-radius: 0.75rem; padding: 1rem; outline: none; transition: border 0.2s; color: #0f172a; }
+    .input-pda:focus { border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2); }
+    input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  </style>
+</head>
+<body class="p-4 md:p-8 flex justify-center items-start min-h-screen">
+  
+  <div class="w-full max-w-md bg-white rounded-3xl shadow-lg border border-slate-200 overflow-hidden">
+    <div class="bg-[#001A70] p-6 text-white text-center relative overflow-hidden">
+      <div class="absolute -right-6 -top-6 text-white opacity-5 text-7xl"><i class="fa-solid fa-dolly"></i></div>
+      <div class="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center mx-auto text-3xl mb-3 relative z-10 backdrop-blur-sm"><i class="fa-solid fa-dolly text-cyan-400"></i></div>
+      <h1 class="text-2xl font-black tracking-tight relative z-10">Puxada de P.A.</h1>
+      <p class="text-cyan-200 text-xs font-bold uppercase tracking-widest mt-1 relative z-10">PDA Logística</p>
+    </div>
+
+    <div class="p-6 space-y-6">
+      <div>
+        <div class="flex justify-between items-end mb-2">
+          <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest">Plano de Envase <span class="text-red-500">*</span></label>
+          <button onclick="carregarPlanosAtivos()" class="text-cyan-600 hover:text-cyan-700 text-[10px] font-black uppercase"><i class="fa-solid fa-rotate-right"></i> Atualizar</button>
+        </div>
+        <select id="selPlano" onchange="aoSelecionarPlano()" class="w-full bg-slate-50 border-2 border-slate-200 text-slate-800 font-bold p-3.5 rounded-xl outline-none focus:border-cyan-500 transition-colors cursor-pointer text-sm">
+          <option value="">Carregando planos...</option>
+        </select>
+      </div>
+
+      <div id="cardInfoProduto" class="hidden bg-cyan-50 border border-cyan-100 rounded-xl p-4 shadow-sm relative overflow-hidden">
+        <div class="flex justify-between items-start mb-1">
+          <p class="text-[9px] font-black text-cyan-600 uppercase tracking-widest" id="infoItemLote">ITEM / LOTE</p>
+          <span id="infoLinha" class="bg-amber-100 text-amber-700 border border-amber-200 px-2 py-0.5 rounded text-[9px] font-black uppercase shadow-sm">LINHA: --</span>
+        </div>
+        <p class="font-black text-slate-800 text-sm leading-tight mb-2" id="infoDesc">DESCRIÇÃO</p>
+        <div class="flex gap-2">
+          <span class="bg-white border border-cyan-200 text-cyan-700 px-2 py-0.5 rounded text-[9px] font-black uppercase" id="infoMoove">MOOVE: --</span>
+          <span class="bg-white border border-cyan-200 text-cyan-700 px-2 py-0.5 rounded text-[9px] font-black uppercase" id="infoPax">PAX: --</span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Seq. Etiqueta <span class="text-red-500">*</span></label>
+          <input type="number" id="seqPuxada" class="input-pda text-cyan-600" placeholder="001">
+        </div>
+        <div>
+          <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 flex justify-between">
+            <span>Qtd Físico</span><span class="text-cyan-500" title="Quantidade Padrão do Palete"><i class="fa-solid fa-wand-magic-sparkles"></i> Auto</span>
+          </label>
+          <div class="relative">
+            <input type="number" id="qtdPuxada" class="input-pda" placeholder="0">
+            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-black text-slate-300">UN</span>
+          </div>
+        </div>
+      </div>
+
+      <button onclick="registrarPalete()" class="w-full bg-cyan-500 hover:bg-cyan-600 text-white font-black text-lg py-4 rounded-xl shadow-lg shadow-cyan-500/30 transition-all active:scale-95 flex justify-center items-center gap-2">
+        <i class="fa-solid fa-barcode"></i> REGISTRAR PALETE
+      </button>
+    </div>
+  </div>
+
+  <script>
+    const client = window.supabase.createClient('https://cbrwmscaidyeaamyfiyt.supabase.co', 'sb_publishable_neiGbVa2X1nBfX5wT3UGYw_3RWe43_G');
+    let planosGlobais = [];
+    let produtosGlobais = {}; 
+
+    window.onload = () => carregarPlanosAtivos();
+
+    async function carregarPlanosAtivos() {
+      const sel = document.getElementById('selPlano');
+      
+      const {data: planos, error: errPlanos} = await client.from('wms_planos_producao')
+                                                   .select('*')
+                                                   .in('status', ['EM ANDAMENTO', 'AGUARDANDO FECHAMENTO'])
+                                                   .order('id', {ascending:false});
+      
+      if(errPlanos || !planos.length) {
+        sel.innerHTML = '<option value="">Nenhum plano disponível para puxada</option>';
+        document.getElementById('cardInfoProduto').classList.add('hidden');
+        return;
+      }
+      
+      planosGlobais = planos;
+      const {data: prods} = await client.from('produtos_moove').select('*');
+      if(prods) prods.forEach(p => produtosGlobais[p.n_item] = p);
+
+      sel.innerHTML = '<option value="">-- SELECIONE O PLANO --</option>';
+      planos.forEach(p => { 
+        let descCurta = produtosGlobais[p.n_item] ? produtosGlobais[p.n_item].descricao.substring(0, 20) + '...' : 'S/ CADASTRO';
+        let badgeStatus = p.status === 'AGUARDANDO FECHAMENTO' ? ' (Encerrado Prod.)' : '';
+        sel.innerHTML += `<option value="${p.id}">#${p.id} - ${p.n_item} (${descCurta})${badgeStatus}</option>`; 
+      });
+    }
+
+    function aoSelecionarPlano() {
+      const pid = document.getElementById('selPlano').value;
+      const card = document.getElementById('cardInfoProduto');
+      
+      if(!pid) { card.classList.add('hidden'); document.getElementById('qtdPuxada').value = ''; return; }
+
+      const plano = planosGlobais.find(p => p.id == pid);
+      const prod = produtosGlobais[plano.n_item] || { descricao: 'PRODUTO SEM CADASTRO', cod_moove: 'N/A', cod_pax: 'N/A', qtd_palete: 0 };
+
+      document.getElementById('infoItemLote').innerText = `${plano.n_item} | LOTE: ${plano.lote}`;
+      document.getElementById('infoDesc').innerText = prod.descricao;
+      document.getElementById('infoMoove').innerText = `MOOVE: ${prod.cod_moove}`;
+      document.getElementById('infoPax').innerText = `PAX: ${prod.cod_pax}`;
+      
+      // NOVA INFORMAÇÃO: LINHA DE ENVASE
+      document.getElementById('infoLinha').innerHTML = `<i class="fa-solid fa-location-crosshairs"></i> ${plano.linha_envase || 'S/ LINHA'}`;
+      
+      document.getElementById('qtdPuxada').value = prod.qtd_palete; 
+      
+      card.classList.remove('hidden');
+      document.getElementById('seqPuxada').focus(); 
+    }
+
+    async function registrarPalete() {
+      const pid = document.getElementById('selPlano').value;
+      const seq = document.getElementById('seqPuxada').value;
+      const qtd = document.getElementById('qtdPuxada').value;
+
+      if(!pid || !seq || !qtd) return Swal.fire('Erro', 'Preencha o Sequencial e a Quantidade.', 'warning');
+
+      const plano = planosGlobais.find(p => p.id == pid);
+      const user = JSON.parse(localStorage.getItem('flowWmsUser')) || {nome:'Conferente'};
+      const codPalete = `PLT-${plano.lote}-${seq}`;
+
+      Swal.fire({title: 'Gravando...', allowOutsideClick: false, didOpen:()=>Swal.showLoading()});
+
+      const {error} = await client.from('wms_paletes').insert([{
+        codigo_palete: codPalete,
+        plano_id: plano.id,
+        seq_producao: parseInt(seq),
+        n_item: plano.n_item,
+        lote: plano.lote,
+        qtd: parseFloat(qtd),
+        status: 'TRANSICAO',
+        recebido_por: user.nome
+      }]);
+
+      if(error) {
+        if(error.code === '23505') { 
+          Swal.fire('Seq Duplicado!', `O Sequencial <b>${seq}</b> já foi bipado neste plano! Verifique o palete.`, 'error');
+        } else {
+          Swal.fire('Erro', error.message, 'error');
+        }
+      } else {
+        const Toast = Swal.mixin({ toast: true, position: "top-end", showConfirmButton: false, timer: 1500 });
+        Toast.fire({ icon: "success", title: `Palete SEQ ${seq} registrado!` });
+        document.getElementById('seqPuxada').value = '';
+        document.getElementById('seqPuxada').focus();
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; padding: 2rem; }
+    .card-modern { background: white; border-radius: 1.25rem; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+    .input-modern { width: 100%; background-color: #f8fafc; border: 2px solid #e2e8f0; color: #1e293b; font-weight: 700; border-radius: 1rem; padding: 1rem 1.25rem; outline: none; transition: all 0.2s; }
+    .input-modern:focus { background-color: #ffffff; border-color: #3b82f6; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); }
+  </style>
+</head>
+<body>
+
+  <div class="max-w-3xl mx-auto">
+    
+    <div class="flex items-center gap-4 mb-8">
+      <div class="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center text-2xl border border-indigo-100 shadow-sm">
+        <i class="fa-solid fa-industry"></i>
+      </div>
+      <div>
+        <h1 class="text-3xl font-black text-slate-800 tracking-tight">Lançamento de Produção</h1>
+        <p class="text-slate-500 font-bold text-sm">Declare a quantidade envasada e envie para a logística</p>
+      </div>
+    </div>
+
+    <div class="card-modern p-8 mb-6">
+      <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-3">Buscar Produto (Código Moove ou Elvin)</label>
+      <div class="flex gap-3">
+        <div class="relative flex-grow">
+          <i class="fa-solid fa-barcode absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
+          <input type="text" id="buscaProd" onkeypress="if(event.key === 'Enter') buscarProduto()" class="input-modern pl-12 text-lg" placeholder="Ex: 120932">
+        </div>
+        <button onclick="buscarProduto()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 rounded-xl font-bold text-xl shadow-md transition-colors active:scale-95"><i class="fa-solid fa-magnifying-glass"></i></button>
+      </div>
+      <div id="resultadosBusca" class="mt-4 space-y-3"></div>
+    </div>
+
+    <div id="formProducao" class="card-modern p-8 hidden">
+      <div class="mb-6 pb-6 border-b border-slate-100">
+        <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Item Selecionado</label>
+        <input type="text" id="descProd" class="w-full bg-slate-50 border border-slate-200 text-slate-700 font-bold px-4 py-3 rounded-xl outline-none" readonly>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div>
+          <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Lote <span class="text-red-500">*</span></label>
+          <input type="text" id="loteProd" class="input-modern uppercase" placeholder="EX: LI88822">
+        </div>
+        <div>
+          <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Data Fabricação <span class="text-red-500">*</span></label>
+          <input type="date" id="dataProd" class="input-modern">
+        </div>
+        <div class="md:col-span-2">
+          <label class="block text-[11px] font-black text-indigo-500 uppercase tracking-widest mb-2">Qtd Produzida (Físico) <span class="text-red-500">*</span></label>
+          <div class="relative">
+            <input type="number" id="qtdProd" class="input-modern text-3xl text-center text-indigo-700" placeholder="0">
+            <span class="absolute right-5 top-1/2 -translate-y-1/2 font-black text-indigo-300 text-xl">UN</span>
+          </div>
+        </div>
+      </div>
+
+      <button id="btnSalvarProd" onclick="enviarParaLogistica()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 rounded-xl shadow-lg transition-all text-lg flex items-center justify-center gap-3">
+        <i class="fa-solid fa-paper-plane"></i> ENVIAR PARA LOGÍSTICA
+      </button>
+    </div>
+  </div>
+
+  <script>
+    const client = window.supabase.createClient('https://cbrwmscaidyeaamyfiyt.supabase.co', 'sb_publishable_neiGbVa2X1nBfX5wT3UGYw_3RWe43_G');
+    let itemSelecionado = null;
+
+    async function buscarProduto() {
+      const termo = document.getElementById('buscaProd').value.replace(/\D/g, '');
+      if (!termo) return;
+      document.getElementById('resultadosBusca').innerHTML = '<div class="text-center p-4 text-slate-400 font-bold"><i class="fa-solid fa-spinner fa-spin"></i> Buscando...</div>';
+      document.getElementById('formProducao').classList.add('hidden');
+      
+      const { data } = await client.from('produtos_moove').select('*').or(`n_item.ilike.%${termo}%,cod_moove.ilike.%${termo}%,cod_pax.ilike.%${termo}%`).limit(5);
+      
+      if (!data || data.length === 0) return document.getElementById('resultadosBusca').innerHTML = `<div class="p-4 bg-red-50 border border-red-200 text-red-600 rounded-xl font-bold text-sm"><i class="fa-solid fa-circle-exclamation mr-2"></i>Produto não encontrado.</div>`;
+      
+      let html = '';
+      data.forEach(r => {
+        let obj = { nItem: r.n_item, desc: r.descricao };
+        html += `<div class="p-4 bg-white border-2 border-slate-100 rounded-xl cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/50 transition-colors" onclick='selecionar(${JSON.stringify(obj)})'><h3 class="font-black text-slate-700">${r.descricao}</h3><p class="text-xs font-bold text-slate-400 mt-1">Elvin: ${r.n_item} | Moove: ${r.cod_moove}</p></div>`;
+      });
+      document.getElementById('resultadosBusca').innerHTML = html;
+    }
+
+    function selecionar(obj) {
+      itemSelecionado = obj;
+      document.getElementById('resultadosBusca').innerHTML = '';
+      document.getElementById('descProd').value = `${obj.nItem} - ${obj.desc}`;
+      document.getElementById('loteProd').value = '';
+      document.getElementById('dataProd').value = '';
+      document.getElementById('qtdProd').value = '';
+      document.getElementById('formProducao').classList.remove('hidden');
+    }
+
+    async function enviarParaLogistica() {
+      const lote = document.getElementById('loteProd').value.trim().toUpperCase();
+      const dataFab = document.getElementById('dataProd').value;
+      const qtd = parseFloat(document.getElementById('qtdProd').value) || 0;
+
+      if (!lote || !dataFab || qtd <= 0) return Swal.fire('Atenção', 'Preencha Lote, Data e Quantidade.', 'warning');
+      
+      const user = JSON.parse(localStorage.getItem('flowWmsUser')) || { nome: 'Desconhecido' };
+      
+      document.getElementById('btnSalvarProd').disabled = true;
+      document.getElementById('btnSalvarProd').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ENVIANDO...';
+
+      const { error } = await client.from('recebimento_wms').insert([{
+        data_registro: new Date().toISOString().split('T')[0],
+        n_item: itemSelecionado.nItem,
+        lote: lote,
+        data_fabricacao: dataFab,
+        qtd_producao: qtd,
+        status: 'AGUARDANDO CONFERENCIA',
+        usuario_producao: user.nome
+      }]);
+
+      if (error) {
+        Swal.fire('Erro', 'Falha ao enviar.', 'error');
+        document.getElementById('btnSalvarProd').disabled = false;
+        document.getElementById('btnSalvarProd').innerHTML = '<i class="fa-solid fa-paper-plane"></i> ENVIAR PARA LOGÍSTICA';
+      } else {
+        Swal.fire({ title: 'Enviado!', text: 'A logística já pode iniciar a conferência.', icon: 'success', confirmButtonColor: '#4f46e5' });
+        document.getElementById('formProducao').classList.add('hidden');
+        document.getElementById('buscaProd').value = '';
+        document.getElementById('btnSalvarProd').disabled = false;
+        document.getElementById('btnSalvarProd').innerHTML = '<i class="fa-solid fa-paper-plane"></i> ENVIAR PARA LOGÍSTICA';
+      }
+    }
+  </script>
+</body>
+</html>
