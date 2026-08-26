@@ -4,17 +4,17 @@
   "description": "Sistema de Gestão Logística e Produto Acabado",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#001A70",
+  "background_color": "#0f172a",
   "theme_color": "#001A70",
   "icons": [
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/3058/3058962.png",
+      "src": "https://cdn-icons-png.flaticon.com/512/2830/2830305.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/3058/3058962.png",
+      "src": "https://cdn-icons-png.flaticon.com/512/2830/2830305.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"

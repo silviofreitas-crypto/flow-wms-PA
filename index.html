@@ -2,27 +2,41 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Login | FLOW WMS</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+  
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#001A70">
+  <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2830/2830305.png">
+  
   <style>
     body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
     .input-login { width: 100%; background-color: #f1f5f9; border: 2px solid transparent; color: #1e293b; font-weight: 600; border-radius: 1rem; padding: 1rem 1.25rem; outline: none; }
     .input-login:focus { background-color: #ffffff; border-color: #0055A5; }
   </style>
-<!-- Configurações do App (PWA) -->
-  <link rel="manifest" href="./manifest.json">
-  <meta name="theme-color" content="#001A70">
-  <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3058/3058962.png">
 </head>
-<body class="h-screen w-full flex bg-white">
+<body class="min-h-screen w-full flex flex-col md:flex-row bg-slate-50 md:bg-white overflow-y-auto">
 
+  <!-- HEADER MOBILE (Exclusivo para o PDA) -->
+  <div class="md:hidden w-full bg-gradient-to-br from-[#001A70] to-[#0055A5] p-8 text-white text-center rounded-b-[2rem] shadow-xl mb-6">
+    <div class="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mx-auto text-3xl mb-4 backdrop-blur-sm border border-white/20">
+      <i class="fa-solid fa-cube text-[#00B5E2]"></i>
+    </div>
+    <h1 class="text-4xl font-black tracking-widest mb-1">FLOW<span class="text-[#00B5E2] font-light">WMS</span></h1>
+    <p class="text-[10px] font-bold text-blue-200 uppercase tracking-widest">Produto Acabado</p>
+  </div>
+
+  <!-- LADO ESQUERDO (Apenas Desktop) -->
   <div class="hidden md:flex md:w-1/2 bg-gradient-to-br from-[#001A70] to-[#0055A5] flex-col justify-between p-12 text-white relative">
     <div>
+      <div class="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center text-2xl mb-4 border border-white/20">
+        <i class="fa-solid fa-cube text-[#00B5E2]"></i>
+      </div>
       <h1 class="text-4xl font-black tracking-widest mb-2">FLOW<span class="text-[#00B5E2] font-light">WMS</span></h1>
       <p class="text-sm font-medium text-blue-200 uppercase tracking-widest">Produto Acabado</p>
     </div>
@@ -32,11 +46,12 @@
     </div>
   </div>
 
-  <div class="w-full md:w-1/2 flex items-center justify-center p-8 bg-slate-50">
-    <div class="w-full max-w-md bg-white p-8 rounded-3xl shadow-xl border border-slate-100">
+  <!-- LADO DIREITO (Login) -->
+  <div class="w-full md:w-1/2 flex items-center justify-center p-6 md:p-8 flex-1">
+    <div class="w-full max-w-md bg-white p-8 rounded-3xl shadow-xl border border-slate-100 relative">
       <div class="mb-8">
         <h3 class="text-2xl font-black text-slate-800">Acesso ao Sistema</h3>
-        <p class="text-sm text-slate-500 mt-1">Insira seu usuário para continuar.</p>
+        <p class="text-sm text-slate-500 mt-1">Insira suas credenciais.</p>
       </div>
 
       <form onsubmit="realizarLogin(event)" class="space-y-5">
@@ -54,7 +69,9 @@
             <input type="password" id="loginSenha" required class="input-login pl-11" placeholder="••••••••">
           </div>
         </div>
-        <button type="submit" id="btnLogar" class="w-full bg-[#0055A5] hover:bg-blue-800 text-white font-black py-4 rounded-xl shadow-lg mt-4">ENTRAR <i class="fa-solid fa-arrow-right"></i></button>
+        <button type="submit" id="btnLogar" class="w-full bg-[#0055A5] hover:bg-blue-800 active:scale-95 text-white font-black py-4 rounded-xl shadow-lg shadow-blue-500/30 transition-all mt-4 flex justify-center items-center gap-2">
+          ENTRAR <i class="fa-solid fa-arrow-right"></i>
+        </button>
       </form>
     </div>
   </div>
@@ -72,7 +89,7 @@
       const pass = document.getElementById('loginSenha').value;
       const btn = document.getElementById('btnLogar');
 
-      btn.disabled = true; btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i>`;
+      btn.disabled = true; btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> VERIFICANDO...`;
 
       const { data, error } = await client.from('usuarios').select('*').eq('login', user).eq('senha', pass).single();
 
@@ -81,7 +98,7 @@
         btn.disabled = false; btn.innerHTML = `ENTRAR <i class="fa-solid fa-arrow-right"></i>`;
       } else {
         localStorage.setItem('flowWmsUser', JSON.stringify(data));
-        window.location.href = 'painel.html'; // REDIRECIONA PARA O PAINEL
+        window.location.href = 'painel.html'; 
       }
     }
   </script>

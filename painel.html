@@ -2,11 +2,16 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Painel | FLOW WMS</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+  
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#001A70">
+  <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2830/2830305.png">
+  
   <style>
     body { font-family: 'Inter', sans-serif; }
     .sidebar-text { transition: opacity 0.2s; white-space: nowrap; }
@@ -14,15 +19,9 @@
     .w-20 #userInitials { width: 2.5rem; height: 2.5rem; font-size: 1rem; }
     .menu-btn { transition: all 0.2s ease; }
     .menu-btn.ativo { background-color: #0055A5; color: white; box-shadow: 0 4px 6px -1px rgba(0, 85, 165, 0.4); }
-    
-    /* MÁGICA PARA SUMIR COM A BARRA DE ROLAGEM FEIA */
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   </style>
-<!-- Configurações do App (PWA) -->
-  <link rel="manifest" href="./manifest.json">
-  <meta name="theme-color" content="#001A70">
-  <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3058/3058962.png">
 </head>
 <body class="bg-slate-50 h-screen w-full flex overflow-hidden relative">
 
@@ -31,7 +30,7 @@
   <aside id="sidebar" class="w-64 bg-[#001A70] text-slate-300 h-full flex flex-col shrink-0 fixed md:relative z-50 transform -translate-x-full md:translate-x-0 transition-all duration-300 ease-in-out shadow-2xl md:shadow-none">
     <div class="h-20 flex items-center px-6 bg-[#001250] justify-between md:justify-start">
       <h1 class="text-xl font-black tracking-widest text-white sidebar-text">FLOW<span class="text-[#00B5E2] font-light">WMS</span></h1>
-      <i class="fa-solid fa-cubes text-[#00B5E2] text-2xl hidden md:hidden" id="miniLogo"></i>
+      <i class="fa-solid fa-cube text-[#00B5E2] text-2xl hidden md:hidden" id="miniLogo"></i>
       <button onclick="toggleMobileSidebar()" class="md:hidden text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
     </div>
     
@@ -41,7 +40,6 @@
       <p class="text-[#00B5E2] text-[10px] font-black uppercase tracking-widest mt-1 bg-blue-900/50 px-2 py-0.5 rounded sidebar-text" id="userRole">PERFIL</p>
     </div>
 
-    <!-- Aplicamos o no-scrollbar aqui -->
     <div class="px-3 py-6 flex-1 overflow-y-auto no-scrollbar">
       <p class="text-[9px] font-bold text-blue-400/50 uppercase tracking-widest mb-3 px-3 sidebar-text">Módulos</p>
       <nav id="menuDinamico" class="space-y-1.5"></nav>
