@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Logístico | Expedição</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #f4f7fe; color: #1e293b; padding: 1.5rem; }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+    
+    .card-dash { background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03); transition: transform 0.2s, box-shadow 0.2s; }
+    .card-dash:hover { box-shadow: 0 10px 25px rgba(0, 0, 0, 0.06); }
+    
+    .kpi-title { font-size: 0.7rem; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+    .kpi-value { font-size: 2rem; font-weight: 900; color: #0f172a; line-height: 1.1; }
+    .kpi-icon { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; }
+    
+    .input-pill { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 12px; font-size: 0.75rem; font-weight: 700; color: #334155; outline: none; transition: all 0.2s; cursor: pointer; }
+    .input-pill:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1); background: #fff; }
+  </style>
+</head>
+<body class="antialiased">
+
+  <div class="max-w-[1600px] mx-auto flex flex-col gap-5 pb-10">
+
+    <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-2">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center text-xl shadow-lg shadow-blue-600/30"><i class="fa-solid fa-chart-column"></i></div>
+        <div>
+          <h1 class="text-2xl font-black text-slate-800 tracking-tight leading-none">Dashboard Logístico</h1>
+          <p class="text-slate-500 font-bold text-xs mt-1" id="lbl-registros">0 registros processados</p>
+        </div>
+      </div>
+      <div class="flex gap-3">
+        <button onclick="carregarDashboard()" class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-xl font-bold text-sm shadow-sm transition-colors flex items-center gap-2"><i class="fa-solid fa-rotate-right"></i> Atualizar</button>
+        <button onclick="exportarExcel()" class="bg-white border border-slate-200 hover:bg-emerald-50 text-emerald-600 px-4 py-2 rounded-xl font-bold text-sm shadow-sm transition-colors flex items-center gap-2"><i class="fa-solid fa-download"></i> Exportar Fechamento</button>
+      </div>
+    </div>
+
+    <!-- BARRA DE FORECAST & METAS PRO-RATA -->
+    <div class="card-dash p-6 border-l-4 border-l-blue-600">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-sm font-black text-slate-700 flex items-center gap-2"><i class="fa-solid fa-bullseye text-blue-600"></i> Projeção Mensal de Envase > Carregamento <span class="text-slate-400 font-medium text-xs ml-2" id="lbl-mes-ref">(Geral)</span></h2>
+      </div>
+      
+      <div class="grid grid-cols-2 md:grid-cols-6 gap-4">
+        <div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
+          <p class="kpi-title"><i class="fa-solid fa-crosshairs text-blue-400"></i> Meta Mensal (Litros)</p>
+          <input type="number" id="inpMeta" value="3000000" class="bg-transparent border-b-2 border-slate-300 w-full font-black text-xl text-slate-800 outline-none focus:border-blue-500" onchange="carregarDashboard()">
+        </div>
+        
+        <div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
+          <p class="kpi-title"><i class="fa-solid fa-calendar-day text-emerald-500"></i> Meta Diária</p>
+          <p class="kpi-value text-slate-700" id="meta-diaria">0</p>
+        </div>
+        
+        <div class="bg-amber-50 p-4 rounded-xl border border-amber-100">
+          <p class="kpi-title text-amber-700"><i class="fa-solid fa-route text-amber-500"></i> Meta Acumulada</p>
+          <p class="kpi-value text-amber-600" id="meta-acumulada">0</p>
+          <p class="text-[9px] font-bold text-amber-600 mt-1">Esperado até o hoje</p>
+        </div>
+        
+        <div class="bg-blue-50 p-4 rounded-xl border border-blue-100">
+          <p class="kpi-title text-blue-700"><i class="fa-solid fa-bolt text-blue-500"></i> Realizado Acumulado</p>
+          <p class="kpi-value text-blue-700" id="realizado-total">0</p>
+          <p class="text-[10px] font-bold mt-1" id="lbl-var-proporcional">0%</p>
+        </div>
+        
+        <div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
+          <p class="kpi-title"><i class="fa-solid fa-rocket text-indigo-500"></i> Projeção Fim do Mês</p>
+          <p class="kpi-value text-indigo-600" id="projecao-mes">0</p>
+        </div>
+        
+        <div class="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+          <p class="kpi-title text-emerald-700" title="Baseado em 27 Toneladas = 100%"><i class="fa-solid fa-gauge-high text-emerald-500"></i> Eficiência Carga</p>
+          <p class="kpi-value text-emerald-600" id="eficiencia-carga">0%</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- FILTROS -->
+    <div class="flex flex-wrap items-center gap-3 bg-white p-3 rounded-2xl shadow-sm border border-slate-200">
+      <span class="text-xs font-black text-slate-400 uppercase tracking-widest pl-2">Período:</span>
+      <input type="date" id="dataIni" class="input-pill" onchange="carregarDashboard()">
+      <span class="text-slate-300 font-black">-</span>
+      <input type="date" id="dataFim" class="input-pill" onchange="carregarDashboard()">
+      <div class="border-l border-slate-200 h-6 mx-2"></div>
+      <select id="filtroCli" class="input-pill" onchange="carregarDashboard()">
+        <option value="TODOS">Todos os Clientes</option>
+        <option value="MOOVE">Moove</option>
+        <option value="EVORA">Evora</option>
+        <option value="TOYOTA">Toyota</option>
+      </select>
+    </div>
+
+    <!-- KPIS -->
+    <div class="grid grid-cols-2 lg:grid-cols-7 gap-4">
+      <div class="card-dash p-5 relative overflow-hidden group">
+        <h3 class="kpi-title">Total de Litros <span class="kpi-icon bg-blue-100 text-blue-500 absolute top-4 right-4"><i class="fa-solid fa-droplet"></i></span></h3>
+        <p class="kpi-value mt-2 text-blue-600 text-2xl" id="kpi-litros">0</p>
+      </div>
+      <div class="card-dash p-5 relative overflow-hidden">
+        <h3 class="kpi-title">Total de KG <span class="kpi-icon bg-slate-100 text-slate-500 absolute top-4 right-4"><i class="fa-solid fa-weight-hanging"></i></span></h3>
+        <p class="kpi-value mt-2 text-2xl" id="kpi-kg">0</p>
+      </div>
+      <div class="card-dash p-5 relative overflow-hidden">
+        <h3 class="kpi-title">Total de Peças <span class="kpi-icon bg-indigo-100 text-indigo-500 absolute top-4 right-4"><i class="fa-solid fa-cube"></i></span></h3>
+        <p class="kpi-value mt-2 text-2xl" id="kpi-pecas">0</p>
+      </div>
+      <div class="card-dash p-5 relative overflow-hidden">
+        <h3 class="kpi-title">Total Paletes <span class="kpi-icon bg-blue-100 text-blue-500 absolute top-4 right-4"><i class="fa-solid fa-layer-group"></i></span></h3>
+        <p class="kpi-value mt-2 text-2xl" id="kpi-paletes">0</p>
+      </div>
+      <div class="card-dash p-5 relative overflow-hidden">
+        <h3 class="kpi-title">Notas Fiscais <span class="kpi-icon bg-blue-50 text-blue-400 absolute top-4 right-4"><i class="fa-solid fa-file-invoice"></i></span></h3>
+        <p class="kpi-value mt-2 text-2xl" id="kpi-nfs">0</p>
+      </div>
+      <div class="card-dash p-5 relative overflow-hidden">
+        <h3 class="kpi-title">Municípios <span class="kpi-icon bg-blue-50 text-blue-400 absolute top-4 right-4"><i class="fa-solid fa-map-pin"></i></span></h3>
+        <p class="kpi-value mt-2 text-2xl" id="kpi-mun">0</p>
+      </div>
+      <div class="card-dash p-5 relative overflow-hidden">
+        <h3 class="kpi-title">Total Veículos <span class="kpi-icon bg-blue-50 text-blue-400 absolute top-4 right-4"><i class="fa-solid fa-truck"></i></span></h3>
+        <p class="kpi-value mt-2 text-2xl" id="kpi-veiculos">0</p>
+        <p class="text-[10px] font-bold text-slate-400 mt-1" id="lbl-veiculos-dia">0.0 / dia</p>
+      </div>
+    </div>
+
+    <!-- GRÁFICOS: LINHA 1 -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="card-dash p-6 h-[400px] flex flex-col">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="font-black text-slate-700 text-sm">Acumulado do Período (Litros)</h3>
+          <span class="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded border border-slate-200 shadow-sm" id="badge-crescimento">Projeção x Forecast</span>
+        </div>
+        <div class="flex-grow relative w-full h-full"><canvas id="chartAcumulado"></canvas></div>
+      </div>
+      <div class="card-dash p-6 h-[400px] flex flex-col relative">
+        <h3 class="font-black text-slate-700 text-sm mb-4">Faturamento por Marca (Peças)</h3>
+        <div class="flex-grow relative w-full h-full flex justify-center items-center"><canvas id="chartClientes"></canvas></div>
+      </div>
+    </div>
+
+    <!-- GRÁFICOS: LINHA 2 -->
+    <div class="card-dash p-6 h-[350px] flex flex-col">
+      <h3 class="font-black text-slate-700 text-sm mb-4">Veículos ao Longo do Tempo</h3>
+      <div class="flex-grow relative w-full h-full"><canvas id="chartTempo"></canvas></div>
+    </div>
+
+    <!-- GRÁFICOS: LINHA 3 -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="card-dash p-6 h-[350px] flex flex-col">
+        <h3 class="font-black text-slate-700 text-sm mb-4">Curva ABC Produtos (Litros)</h3>
+        <div class="flex-grow relative w-full h-full"><canvas id="chartABC"></canvas></div>
+      </div>
+      <div class="card-dash p-6 h-[350px] flex flex-col">
+        <h3 class="font-black text-slate-700 text-sm mb-4">Volume por Destino / Município (Kg)</h3>
+        <div class="flex-grow relative w-full h-full"><canvas id="chartMun"></canvas></div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const client = window.supabase.createClient('https://cbrwmscaidyeaamyfiyt.supabase.co', 'sb_publishable_neiGbVa2X1nBfX5wT3UGYw_3RWe43_G');
+    let chartAcum, chartTempo, chartABC, chartMun, chartCli;
+    let dadosBrutosExcel = [];
+
+    const dataAtual = new Date();
+    const primeiroDia = new Date(dataAtual.getFullYear(), dataAtual.getMonth(), 1).toISOString().split('T')[0];
+    const hojeStr = dataAtual.toISOString().split('T')[0];
+    
+    document.getElementById('dataIni').value = primeiroDia;
+    document.getElementById('dataFim').value = hojeStr;
+    
+    carregarDashboard();
+
+    function zerarKPIs() {
+      document.getElementById('lbl-registros').innerText = "0 registros processados";
+      document.getElementById('kpi-litros').innerText = "0";
+      document.getElementById('kpi-kg').innerText = "0";
+      document.getElementById('kpi-pecas').innerText = "0";
+      document.getElementById('kpi-paletes').innerText = "0";
+      document.getElementById('kpi-nfs').innerText = "0";
+      document.getElementById('kpi-mun').innerText = "0";
+      document.getElementById('kpi-veiculos').innerText = "0";
+      document.getElementById('lbl-veiculos-dia').innerText = "0.0 / dia";
+      document.getElementById('eficiencia-carga').innerText = "0%";
+      document.getElementById('meta-diaria').innerText = "0 L";
+      document.getElementById('meta-acumulada').innerText = "0 L";
+      document.getElementById('realizado-total').innerText = "0 L";
+      document.getElementById('projecao-mes').innerText = "0 L";
+      document.getElementById('lbl-var-proporcional').innerHTML = "0% vs Meta Acumulada";
+      document.getElementById('badge-crescimento').innerHTML = "Sem base anterior";
+
+      if(chartAcum) chartAcum.destroy(); if(chartTempo) chartTempo.destroy(); if(chartABC) chartABC.destroy(); if(chartMun) chartMun.destroy(); if(chartCli) chartCli.destroy();
+    }
+
+    async function carregarDashboard() {
+      Swal.fire({ title: 'Processando Dados...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+      
+      const dIniStr = document.getElementById('dataIni').value;
+      const dFimStr = document.getElementById('dataFim').value;
+      const fCli = document.getElementById('filtroCli').value;
+      const metaMes = parseFloat(document.getElementById('inpMeta').value) || 1;
+
+      let dtI = new Date(dIniStr + "T00:00:00"); 
+      let dtF = new Date(dFimStr + "T23:59:59");
+      
+      let prevIni = new Date(dtI); prevIni.setMonth(prevIni.getMonth() - 1);
+      let prevFim = new Date(dtF); prevFim.setMonth(prevFim.getMonth() - 1);
+      
+      let prevIniStr = prevIni.toISOString().split('T')[0];
+      let prevFimStr = prevFim.toISOString().split('T')[0];
+
+      document.getElementById('lbl-mes-ref').innerText = `(${("0" + (dtF.getMonth()+1)).slice(-2)}/${dtF.getFullYear()} - Geral)`;
+
+      try {
+        const { data: prods, error: errProd } = await client.from('produtos_moove').select('*');
+        if (errProd) throw errProd;
+        let dictProd = {}; 
+        prods.forEach(p => { dictProd[p.n_item] = { peso: parseFloat(p.peso) || 0, cliente: p.cliente, desc: p.descricao }; });
+
+        const { data: cargas, error: errCargas } = await client.from('wms_cargas')
+          .select('id, destino, nota_fiscal, expedido_em, wms_paletes(qtd, n_item)')
+          .eq('status', 'EXPEDIDA')
+          .gte('expedido_em', `${prevIniStr}T00:00:00.000Z`)
+          .lte('expedido_em', `${dFimStr}T23:59:59.999Z`)
+          .order('expedido_em', {ascending: true});
+
+        if (errCargas) throw errCargas;
+
+        if(!cargas || cargas.length === 0) {
+          zerarKPIs();
+          Swal.close();
+          return;
+        }
+
+        let cargasAtuais = [];
+        let cargasAntigas = [];
+        dadosBrutosExcel = [];
+
+        cargas.forEach(c => {
+           let dtExp = c.expedido_em.split('T')[0];
+           
+           let cliCarga = 'OUTROS';
+           if(c.wms_paletes.length > 0) {
+              let pEx = c.wms_paletes[0];
+              if(dictProd[pEx.n_item]) cliCarga = dictProd[pEx.n_item].cliente;
+           }
+           if (fCli !== 'TODOS' && cliCarga !== fCli) return;
+
+           if (dtExp >= dIniStr && dtExp <= dFimStr) {
+             cargasAtuais.push(c);
+             c.wms_paletes.forEach(p => {
+               let pesoU = dictProd[p.n_item] ? dictProd[p.n_item].peso : 0;
+               let kg = p.qtd * pesoU;
+               dadosBrutosExcel.push({ Data: dtExp, Ordem: c.id, NF: c.nota_fiscal, Destino: c.destino, Item: p.n_item, Qtd: p.qtd, KG: kg, Litros: kg/0.89 });
+             });
+           } else if (dtExp >= prevIniStr && dtExp <= prevFimStr) {
+             cargasAntigas.push(c);
+           }
+        });
+
+        if (cargasAtuais.length === 0) {
+          zerarKPIs();
+          Swal.close();
+          return;
+        }
+
+        document.getElementById('lbl-registros').innerText = `${cargasAtuais.length} faturamentos no período atual`;
+
+        let curLiters = 0, curKg = 0, curPecas = 0, curPaletes = 0, curNFs = new Set(), curMun = new Set();
+        let mapCurVeicDia = {}, mapAbc = {}, mapMun = {}, mapCliPecas = {};
+        
+        let msFiltro = new Date(dFimStr).getTime() - new Date(dIniStr).getTime();
+        let diasPeriodo = Math.round(msFiltro / (1000 * 3600 * 24)) + 1;
+        if(diasPeriodo <= 0) diasPeriodo = 1;
+
+        let diasNoMes = new Date(dtF.getFullYear(), dtF.getMonth() + 1, 0).getDate();
+        let curDiarioMap = new Array(diasNoMes).fill(0);
+        let prevDiarioMap = new Array(diasNoMes).fill(0);
+
+        let somaEficiencia = 0;
+
+        cargasAtuais.forEach(c => {
+          let dtExp = c.expedido_em.split('T')[0];
+          let diaMes = parseInt(dtExp.split('-')[2]); 
+          
+          curPaletes += c.wms_paletes.length;
+          if(c.nota_fiscal) curNFs.add(c.nota_fiscal);
+          let dest = c.destino || 'S/D'; curMun.add(dest);
+          
+          mapCurVeicDia[dtExp] = (mapCurVeicDia[dtExp] || 0) + 1;
+
+          let veiculoPesoAtualKG = 0;
+
+          c.wms_paletes.forEach(p => {
+             let qtd = parseFloat(p.qtd) || 0;
+             let pesoU = dictProd[p.n_item] ? dictProd[p.n_item].peso : 0;
+             let cliP = dictProd[p.n_item] ? dictProd[p.n_item].cliente : 'OUTROS';
+             let kg = qtd * pesoU;
+             let lt = kg / 0.89;
+
+             curPecas += qtd; curKg += kg; curLiters += lt;
+             veiculoPesoAtualKG += kg;
+             
+             curDiarioMap[diaMes-1] += lt;
+             mapAbc[p.n_item] = (mapAbc[p.n_item] || 0) + lt;
+             mapMun[dest] = (mapMun[dest] || 0) + kg;
+             mapCliPecas[cliP] = (mapCliPecas[cliP] || 0) + qtd;
+          });
+
+          let eficienciaV = veiculoPesoAtualKG / 27000;
+          if(eficienciaV > 1) eficienciaV = 1;
+          somaEficiencia += eficienciaV;
+        });
+
+        let prevLiters = 0;
+        cargasAntigas.forEach(c => {
+          let dtExp = c.expedido_em.split('T')[0];
+          let diaMes = parseInt(dtExp.split('-')[2]);
+          c.wms_paletes.forEach(p => {
+             let kg = p.qtd * (dictProd[p.n_item] ? dictProd[p.n_item].peso : 0);
+             let lt = kg / 0.89;
+             prevLiters += lt;
+             if(diaMes-1 < diasNoMes) prevDiarioMap[diaMes-1] += lt;
+          });
+        });
+
+        document.getElementById('kpi-litros').innerText = curLiters.toLocaleString('pt-BR', {maximumFractionDigits:0});
+        document.getElementById('kpi-kg').innerText = curKg.toLocaleString('pt-BR', {maximumFractionDigits:0});
+        document.getElementById('kpi-pecas').innerText = curPecas.toLocaleString('pt-BR');
+        document.getElementById('kpi-paletes').innerText = curPaletes.toLocaleString('pt-BR');
+        document.getElementById('kpi-nfs').innerText = curNFs.size;
+        document.getElementById('kpi-mun').innerText = curMun.size;
+        document.getElementById('kpi-veiculos').innerText = cargasAtuais.length;
+
+        let efiGeral = cargasAtuais.length > 0 ? (somaEficiencia / cargasAtuais.length) * 100 : 0;
+        document.getElementById('eficiencia-carga').innerText = efiGeral.toFixed(1) + '%';
+
+        let hojeObj = new Date();
+        hojeObj.setHours(0,0,0,0);
+        let dtFCalculo = new Date(dtF);
+        dtFCalculo.setHours(0,0,0,0);
+
+        let diaCorteCalculo = dtFCalculo.getDate(); 
+        if (dtFCalculo > hojeObj) {
+           diaCorteCalculo = hojeObj.getDate();
+        }
+        if (diaCorteCalculo <= 0) diaCorteCalculo = 1;
+
+        let metaDia = metaMes / diasNoMes;
+        let realizadoDia = curLiters / diaCorteCalculo;
+        let projMensal = realizadoDia * diasNoMes;
+        let veicDia = cargasAtuais.length / diaCorteCalculo; 
+
+        // NOVA LÓGICA: META ACUMULADA (PRO-RATA)
+        let metaAcumulada = metaDia * diaCorteCalculo;
+
+        document.getElementById('meta-diaria').innerText = metaDia.toLocaleString('pt-BR', {maximumFractionDigits:0}) + ' L';
+        document.getElementById('meta-acumulada').innerText = metaAcumulada.toLocaleString('pt-BR', {maximumFractionDigits:0}) + ' L';
+        document.getElementById('realizado-total').innerText = curLiters.toLocaleString('pt-BR', {maximumFractionDigits:0}) + ' L';
+        document.getElementById('projecao-mes').innerText = projMensal.toLocaleString('pt-BR', {maximumFractionDigits:0}) + ' L';
+        
+        document.getElementById('lbl-veiculos-dia').innerText = veicDia.toFixed(1) + ' / dia';
+
+        // VARIAÇÃO PROPORCIONAL NO CARD DE REALIZADO
+        let varProp = 0;
+        if (metaAcumulada > 0) {
+            varProp = ((curLiters / metaAcumulada) - 1) * 100;
+        }
+        
+        let lblVar = document.getElementById('lbl-var-proporcional');
+        if (varProp >= 0) {
+            lblVar.innerHTML = `<span class="text-emerald-500"><i class="fa-solid fa-arrow-trend-up"></i> +${varProp.toFixed(1)}%</span> vs Meta Acumulada`;
+        } else {
+            lblVar.innerHTML = `<span class="text-red-500"><i class="fa-solid fa-arrow-trend-down"></i> ${varProp.toFixed(1)}%</span> vs Meta Acumulada`;
+        }
+
+        // BADGE: PROJEÇÃO VS FORECAST NO GRÁFICO
+        let badge = document.getElementById('badge-crescimento');
+        let diffMeta = ((projMensal / metaMes) - 1) * 100;
+        
+        if (diffMeta >= 0) {
+            badge.innerHTML = `<i class="fa-solid fa-arrow-trend-up"></i> +${diffMeta.toFixed(1)}% vs Forecast`;
+            badge.className = "text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded border border-emerald-100 shadow-sm";
+        } else {
+            badge.innerHTML = `<i class="fa-solid fa-arrow-trend-down"></i> ${diffMeta.toFixed(1)}% vs Forecast`;
+            badge.className = "text-xs font-bold text-red-600 bg-red-50 px-2 py-1 rounded border border-red-100 shadow-sm";
+        }
+
+        renderGraficos(diasNoMes, diaCorteCalculo, curDiarioMap, prevDiarioMap, mapCurVeicDia, mapAbc, mapMun, mapCliPecas);
+
+        Swal.close();
+      } catch (err) { Swal.fire('Erro', err.message, 'error'); }
+    }
+
+    function renderGraficos(diasNoMes, diaCorteCalculo, curDiarioMap, prevDiarioMap, mapCurVeicDia, mapAbc, mapMun, mapCli) {
+      if(chartAcum) chartAcum.destroy(); if(chartTempo) chartTempo.destroy(); if(chartABC) chartABC.destroy(); if(chartMun) chartMun.destroy(); if(chartCli) chartCli.destroy();
+      Chart.defaults.font.family = 'Inter'; Chart.defaults.color = '#94a3b8';
+
+      // ============================================
+      // 1. ACUMULADO (Linhas)
+      let acumCur = [], acumPrev = [], projTrend = [];
+      let c = 0, p = 0;
+      let labelsDias = [];
+
+      let mediaMovel = 0;
+      let sumRealizado = 0;
+      for(let i=0; i<diaCorteCalculo; i++) sumRealizado += curDiarioMap[i] || 0;
+      if (diaCorteCalculo > 0) mediaMovel = sumRealizado / diaCorteCalculo;
+
+      for(let i=0; i<diasNoMes; i++) {
+        labelsDias.push(`Dia ${i+1}`);
+        
+        p += prevDiarioMap[i] || 0; 
+        acumPrev.push(p);
+        
+        if(i < diaCorteCalculo) {
+            c += curDiarioMap[i] || 0;
+            acumCur.push(c);
+        } else {
+            acumCur.push(null);
+        }
+        
+        projTrend.push(mediaMovel * (i+1));
+      }
+
+      chartAcum = new Chart(document.getElementById('chartAcumulado').getContext('2d'), {
+        type: 'line',
+        data: { labels: labelsDias, datasets: [
+          { label: 'Mês Atual', data: acumCur, borderColor: '#2563eb', tension: 0.3, borderWidth: 3, pointRadius: 2, pointBackgroundColor: '#2563eb' },
+          { label: 'Mês Anterior', data: acumPrev, borderColor: '#10b981', borderDash: [5, 5], tension: 0.3, borderWidth: 2, pointRadius: 0 },
+          { label: 'Tendência Linear', data: projTrend, borderColor: '#f59e0b', borderDash: [2, 2], tension: 0, borderWidth: 2, pointRadius: 0 }
+        ]},
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: {usePointStyle: true, boxWidth: 8, font:{weight:'bold', size:10}} }, tooltip: {callbacks: {label: function(ctx) { return ctx.dataset.label + ': ' + ctx.raw.toLocaleString('pt-BR', {maximumFractionDigits:0}) + ' L'; }}} }, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, border: {display:false} } } }
+      });
+
+      // ============================================
+      // 2. TEMPO (Barras - Veículos por dia baseado no filtro de datas)
+      let tempoLabels = [];
+      let tempoData = [];
+      
+      let dtLoop = new Date(document.getElementById('dataIni').value + "T00:00:00");
+      let dtEnd = new Date(document.getElementById('dataFim').value + "T00:00:00");
+      
+      while(dtLoop <= dtEnd) {
+          let iso = dtLoop.toISOString().split('T')[0];
+          let p = iso.split('-');
+          tempoLabels.push(`${p[2]}/${p[1]}`);
+          tempoData.push(mapCurVeicDia[iso] || 0); 
+          dtLoop.setDate(dtLoop.getDate() + 1);
+      }
+
+      const ctxT = document.getElementById('chartTempo').getContext('2d');
+      chartTempo = new Chart(ctxT, {
+        type: 'bar',
+        data: { labels: tempoLabels, datasets: [{ label: 'Veículos Expedidos', data: tempoData, backgroundColor: '#3b82f6', borderRadius: 4 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { font: {size: 10, weight: 'bold'} } }, y: { beginAtZero: true, border: {display:false}, ticks: { stepSize: 1 } } } }
+      });
+
+      // ============================================
+      // 3. CURVA ABC (Barras Horizontais Coloridas)
+      let abcArr = Object.entries(mapAbc).sort((a,b) => b[1] - a[1]);
+      let totalAbc = abcArr.reduce((acc, curr) => acc + curr[1], 0);
+      
+      let acumuladoPct = 0;
+      let abcLabels = []; let abcData = []; let abcColors = [];
+      
+      abcArr.slice(0, 15).forEach(item => { 
+        abcLabels.push(item[0].length > 25 ? item[0].substring(0, 25) + "..." : item[0]);
+        abcData.push(item[1]);
+        
+        acumuladoPct += (item[1] / totalAbc) * 100;
+        if(acumuladoPct <= 80) abcColors.push('#3b82f6'); 
+        else if (acumuladoPct <= 95) abcColors.push('#eab308'); 
+        else abcColors.push('#ef4444'); 
+      });
+
+      chartABC = new Chart(document.getElementById('chartABC').getContext('2d'), {
+        type: 'bar',
+        data: { labels: abcLabels, datasets: [{ data: abcData, backgroundColor: abcColors, borderRadius: 4 }] },
+        options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(context) { return context.raw.toLocaleString('pt-BR', {maximumFractionDigits:0}) + ' L'; } } } }, scales: { x: { display: false, grid: { display: false } }, y: { grid: { display: false }, ticks: { font: {size: 8, weight: '700'}, color: '#64748b' } } } }
+      });
+
+      // ============================================
+      // 4. MUNICÍPIOS (Barras Horizontais Roxas)
+      let munArr = Object.entries(mapMun).sort((a,b) => b[1] - a[1]).slice(0, 10);
+      chartMun = new Chart(document.getElementById('chartMun').getContext('2d'), {
+        type: 'bar',
+        data: { labels: munArr.map(x=>x[0]), datasets: [{ data: munArr.map(x=>x[1]), backgroundColor: '#a855f7', borderRadius: 4 }] },
+        options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(context) { return context.raw.toLocaleString('pt-BR', {maximumFractionDigits:0}) + ' Kg'; } } } }, scales: { x: { display: false, grid: { display: false } }, y: { grid: { display: false }, ticks: { font: {size: 9, weight: '700'}, color: '#64748b' } } } }
+      });
+
+      // ============================================
+      // 5. CLIENTES (Donut Peças)
+      const cliLabels = Object.keys(mapCli);
+      const coresCli = ['#10b981', '#f59e0b', '#3b82f6', '#f43f5e'];
+      chartCli = new Chart(document.getElementById('chartClientes').getContext('2d'), {
+        type: 'doughnut',
+        data: { labels: cliLabels, datasets: [{ data: cliLabels.map(k => mapCli[k]), backgroundColor: coresCli, borderWidth: 0, cutout: '75%' }] },
+        options: { responsive: true, maintainAspectRatio: false, layout: { padding: 10 }, plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, font: { weight: 'bold' } } } } }
+      });
+    }
+
+    function exportarExcel() {
+      if (dadosBrutosExcel.length === 0) return Swal.fire('Atenção', 'Não há dados no período.', 'warning');
+      const ws = XLSX.utils.json_to_sheet(dadosBrutosExcel);
+      const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Faturamento");
+      XLSX.writeFile(wb, `Expedicao_${document.getElementById('dataIni').value}.xlsx`);
+    }
+  </script>
+</body>
+</html>

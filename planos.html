@@ -10,89 +10,142 @@
   <style>
     body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; padding: 2rem; }
     .card-modern { background: white; border-radius: 1.25rem; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
-    .input-modern { width: 100%; background-color: #f8fafc; border: 2px solid #e2e8f0; color: #1e293b; font-weight: 700; border-radius: 1rem; padding: 1rem 1.25rem; outline: none; transition: all 0.2s; }
-    .input-modern:focus { background-color: #ffffff; border-color: #3b82f6; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); }
+    .input-modern { width: 100%; background-color: #f8fafc; border: 2px solid #e2e8f0; color: #1e293b; font-weight: 700; border-radius: 0.75rem; padding: 0.75rem 1rem; outline: none; transition: all 0.2s; font-size: 0.875rem; }
+    .input-modern:focus { background-color: #ffffff; border-color: #4f46e5; box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1); }
     .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
     .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
   </style>
 </head>
-<body>
-  <div class="max-w-6xl mx-auto flex flex-col lg:flex-row gap-6 h-[85vh]">
-    <!-- Criar Plano -->
-    <div class="w-full lg:w-1/3 card-modern p-6 flex flex-col">
-      <div class="flex items-center gap-3 mb-6 border-b border-slate-100 pb-4">
-        <div class="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-lg"><i class="fa-solid fa-industry"></i></div>
-        <div><h2 class="text-xl font-black text-slate-800">Novo Plano</h2></div>
-      </div>
-      <div class="space-y-4 flex-1 overflow-y-auto custom-scrollbar pr-2">
+<body class="flex flex-col h-[90vh]">
+
+  <div class="max-w-[1400px] w-full mx-auto flex flex-col lg:flex-row gap-6 h-full">
+    
+    <!-- LADO ESQUERDO: NOVO PLANO -->
+    <div class="w-full lg:w-1/3 card-modern p-6 flex flex-col h-full border-t-4 border-t-indigo-600">
+      <div class="flex items-center gap-3 mb-6 border-b border-slate-100 pb-4 shrink-0">
+        <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-xl shadow-sm"><i class="fa-solid fa-industry"></i></div>
         <div>
-          <label class="block text-[10px] font-black text-slate-500 uppercase mb-2">Item (Busque por qualquer código) <span class="text-red-500">*</span></label>
+            <h2 class="text-xl font-black text-slate-800 tracking-tight leading-none">Novo Plano</h2>
+            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Apontamento de Produção</p>
+        </div>
+      </div>
+      
+      <div class="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-5">
+        <div>
+          <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Buscar Produto <span class="text-red-500">*</span></label>
           <div class="flex gap-2">
-            <input type="text" id="buscaProd" class="input-modern py-3 text-sm" placeholder="Ex: 120932 ou E-PA...">
-            <button onclick="buscarProduto()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 rounded-xl font-bold transition-colors"><i class="fa-solid fa-search"></i></button>
+            <input type="text" id="buscaProd" class="input-modern uppercase" placeholder="Cód. Elvin, Pax ou Descrição..." onkeydown="if(event.key === 'Enter') buscarProduto()">
+            <button onclick="buscarProduto()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 rounded-xl font-black shadow-sm transition-transform active:scale-95"><i class="fa-solid fa-search"></i></button>
           </div>
         </div>
+        
         <div id="resBusca" class="text-sm space-y-2"></div>
-        <div id="formPlano" class="hidden space-y-4 mt-4 pt-4 border-t border-slate-100">
+        
+        <div id="formPlano" class="hidden space-y-5 mt-2 pt-5 border-t border-slate-100">
           <input type="hidden" id="nItemSelecionado">
-          <div class="bg-slate-50 border border-slate-200 p-3 rounded-xl">
-            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Produto Selecionado</p>
-            <p id="descSelecionado" class="font-bold text-slate-700 text-xs leading-tight mb-2"></p>
-            <div class="flex flex-wrap gap-1">
-              <span id="badgeMoove" class="bg-blue-50 text-blue-600 border border-blue-100 px-2 py-0.5 rounded text-[9px] font-black uppercase"></span>
-              <span id="badgePax" class="bg-purple-50 text-purple-600 border border-purple-100 px-2 py-0.5 rounded text-[9px] font-black uppercase"></span>
-              <span id="badgePalete" class="bg-emerald-50 text-emerald-600 border border-emerald-100 px-2 py-0.5 rounded text-[9px] font-black uppercase"></span>
+          
+          <div class="bg-indigo-50/50 border border-indigo-100 p-4 rounded-xl relative overflow-hidden">
+            <i class="fa-solid fa-box-open absolute -right-3 -bottom-3 text-5xl text-indigo-100"></i>
+            <p class="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-1 relative z-10">Produto Vinculado</p>
+            <p id="descSelecionado" class="font-bold text-slate-700 text-xs leading-tight mb-3 relative z-10 max-w-[90%] truncate"></p>
+            <div class="flex flex-wrap gap-2 relative z-10">
+              <span id="badgeMoove" class="bg-white text-slate-600 border border-slate-200 px-2 py-0.5 rounded text-[9px] font-black uppercase"></span>
+              <span id="badgePax" class="bg-white text-slate-600 border border-slate-200 px-2 py-0.5 rounded text-[9px] font-black uppercase"></span>
+              <span id="badgePalete" class="bg-emerald-50 text-emerald-600 border border-emerald-200 px-2 py-0.5 rounded text-[9px] font-black uppercase"></span>
             </div>
           </div>
-          <div><label class="block text-[10px] font-black text-slate-500 uppercase mb-2">Lote <span class="text-red-500">*</span></label><input type="text" id="loteProd" class="input-modern py-3 uppercase text-sm"></div>
-          <div><label class="block text-[10px] font-black text-slate-500 uppercase mb-2">Data Fabricação <span class="text-red-500">*</span></label><input type="date" id="dataProd" class="input-modern py-3 text-sm"></div>
+
+          <div class="grid grid-cols-2 gap-4">
+              <div>
+                  <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Lote Físico <span class="text-red-500">*</span></label>
+                  <input type="text" id="loteProd" class="input-modern uppercase" placeholder="Nº Lote">
+              </div>
+              <div>
+                  <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Fabricação <span class="text-red-500">*</span></label>
+                  <input type="date" id="dataProd" class="input-modern text-xs">
+              </div>
+          </div>
           
-          <!-- NOVO CAMPO: LINHA DE ENVASE -->
           <div>
-            <label class="block text-[10px] font-black text-slate-500 uppercase mb-2">Linha de Envase <span class="text-red-500">*</span></label>
-            <select id="linhaEnvase" class="input-modern py-3 text-sm cursor-pointer">
-              <option value="">-- Selecione a Linha --</option>
-              <option value="24x1">Linha 24x1</option>
-              <option value="9x1">Linha 9x1</option>
-              <option value="24x0.5">Linha 24 x 0.5</option>
-              <option value="12x1">Linha 12x1</option>
-              <option value="Tambores">Linha Tambores</option>
-              <option value="Bombonas">Linha Bombonas</option>
-              <option value="Serac">Linha Serac</option>
-            </select>
+            <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Linha de Envase <span class="text-red-500">*</span></label>
+            <div class="relative">
+                <select id="linhaEnvase" class="input-modern cursor-pointer appearance-none">
+                  <option value="">-- Selecione a Linha --</option>
+                  <option value="24x1">Linha 24x1</option>
+                  <option value="9x1">Linha 9x1</option>
+                  <option value="24x0.5">Linha 24 x 0.5</option>
+                  <option value="12x1">Linha 12x1</option>
+                  <option value="Tambores">Linha Tambores</option>
+                  <option value="Bombonas">Linha Bombonas</option>
+                  <option value="Serac">Linha Serac</option>
+                </select>
+                <i class="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+            </div>
           </div>
 
-          <div><label class="block text-[10px] font-black text-indigo-500 uppercase mb-2">Qtd Planejada (UN) <span class="text-red-500">*</span></label><input type="number" id="qtdPlan" class="input-modern py-3 text-indigo-700 text-2xl font-black text-center" placeholder="0"></div>
-          <button onclick="abrirPlano()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 rounded-xl shadow-lg mt-2 transition-transform active:scale-95">ABRIR PLANO <i class="fa-solid fa-play ml-1"></i></button>
+          <div>
+              <label class="block text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1.5">Qtd Planejada (ERP) <span class="text-red-500">*</span></label>
+              <input type="number" id="qtdPlan" class="input-modern text-indigo-700 text-2xl font-black text-center bg-indigo-50/30 border-indigo-200 py-4" placeholder="0">
+          </div>
         </div>
       </div>
-    </div>
-    <!-- Planos em Andamento -->
-    <div class="w-full lg:w-2/3 card-modern p-6 flex flex-col">
-      <div class="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
-        <h2 class="text-xl font-black text-slate-800">Planos Abertos</h2>
-        <button onclick="carregarPlanos()" class="text-slate-400 hover:text-indigo-600 transition-colors"><i class="fa-solid fa-rotate-right"></i></button>
+      
+      <div class="pt-4 border-t border-slate-100 mt-2 shrink-0">
+          <button id="btnAbrir" onclick="abrirPlano()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 rounded-xl shadow-md transition-transform active:scale-95 flex justify-center items-center gap-2 uppercase tracking-wide text-sm hidden">
+              <i class="fa-solid fa-play"></i> Iniciar Plano WMS
+          </button>
       </div>
-      <div class="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3" id="listaPlanos">
-        <div class="text-center text-slate-400 py-10 font-bold">Carregando...</div>
+    </div>
+
+    <!-- LADO DIREITO: LISTAGEM DE PLANOS ABERTOS -->
+    <div class="w-full lg:w-2/3 card-modern p-6 flex flex-col h-full bg-slate-50 border-none">
+      <div class="flex justify-between items-center mb-6 pb-2 shrink-0">
+        <div>
+            <h2 class="text-xl font-black text-slate-800 tracking-tight flex items-center gap-2"><i class="fa-solid fa-gears text-indigo-600"></i> Produção em Andamento</h2>
+            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Lotes aguardando encerramento físico</p>
+        </div>
+        <button onclick="carregarPlanos()" class="bg-white border border-slate-200 text-slate-600 hover:text-indigo-600 px-4 py-2 rounded-xl text-xs font-black shadow-sm transition-colors flex items-center gap-2">
+            <i class="fa-solid fa-rotate-right"></i> Atualizar
+        </button>
+      </div>
+      
+      <div class="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4" id="listaPlanos">
+        <div class="text-center text-slate-400 py-20 font-bold"><i class="fa-solid fa-circle-notch fa-spin text-3xl mb-3"></i><br>Buscando planos ativos...</div>
       </div>
     </div>
   </div>
+
   <script>
     const client = window.supabase.createClient('https://cbrwmscaidyeaamyfiyt.supabase.co', 'sb_publishable_neiGbVa2X1nBfX5wT3UGYw_3RWe43_G');
     window.onload = () => carregarPlanos();
 
     async function buscarProduto() {
-      const termo = document.getElementById('buscaProd').value.replace(/\D/g, '');
+      const termo = document.getElementById('buscaProd').value.trim();
       if (!termo) return;
-      document.getElementById('resBusca').innerHTML = '<div class="text-center text-slate-400 font-bold text-xs py-4"><i class="fa-solid fa-circle-notch fa-spin"></i> Buscando...</div>';
+      
+      document.getElementById('resBusca').innerHTML = '<div class="text-center text-indigo-400 font-bold text-xs py-4"><i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Buscando Base de Dados...</div>';
       document.getElementById('formPlano').classList.add('hidden');
-      const { data } = await client.from('produtos_moove').select('*').or(`n_item.ilike.%${termo}%,cod_moove.ilike.%${termo}%,cod_pax.ilike.%${termo}%`).limit(5);
-      if (!data || data.length === 0) return document.getElementById('resBusca').innerHTML = '<span class="text-red-500 font-bold text-xs bg-red-50 p-2 rounded block">Nenhum produto encontrado.</span>';
+      document.getElementById('btnAbrir').classList.add('hidden');
+      
+      // Busca ampla corrigida (Lógica "OR" abrange Descrição e Códigos)
+      const { data } = await client.from('produtos_moove')
+        .select('*')
+        .or(`n_item.ilike.%${termo}%,cod_moove.ilike.%${termo}%,cod_pax.ilike.%${termo}%,descricao.ilike.%${termo}%`)
+        .limit(10);
+      
+      if (!data || data.length === 0) return document.getElementById('resBusca').innerHTML = '<div class="text-red-500 font-bold text-xs bg-red-50 p-3 rounded-lg border border-red-100 flex items-center gap-2"><i class="fa-solid fa-triangle-exclamation"></i> Nenhum produto compatível encontrado.</div>';
+      
       let html = '';
       data.forEach(r => { 
         let objStr = JSON.stringify({ nItem: r.n_item, desc: r.descricao, moove: r.cod_moove, pax: r.cod_pax, palete: r.qtd_palete });
-        html += `<div class="p-3 border border-slate-200 rounded-xl cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/50 transition-colors" onclick='selecionar(${objStr})'><div class="font-black text-slate-700 text-xs mb-1">${r.descricao}</div><div class="flex gap-2 text-[9px] font-bold text-slate-400"><span>Elvin: ${r.n_item}</span><span>|</span><span>Moove: ${r.cod_moove}</span></div></div>`; 
+        html += `
+            <div class="p-3 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-indigo-400 hover:shadow-md transition-all group mb-2" onclick='selecionar(${objStr})'>
+                <div class="font-black text-slate-700 text-xs mb-1.5 group-hover:text-indigo-700 line-clamp-1">${r.descricao}</div>
+                <div class="flex gap-2 text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                    <span class="bg-slate-100 px-1.5 py-0.5 rounded">Elvin: <span class="text-slate-600">${r.n_item}</span></span>
+                    <span class="bg-slate-100 px-1.5 py-0.5 rounded">Pax: <span class="text-slate-600">${r.cod_pax || '-'}</span></span>
+                </div>
+            </div>`; 
       });
       document.getElementById('resBusca').innerHTML = html;
     }
@@ -100,11 +153,14 @@
     function selecionar(obj) {
       document.getElementById('nItemSelecionado').value = obj.nItem;
       document.getElementById('descSelecionado').innerText = obj.desc;
-      document.getElementById('badgeMoove').innerText = `MOOVE: ${obj.moove}`;
-      document.getElementById('badgePax').innerText = `PAX: ${obj.pax}`;
-      document.getElementById('badgePalete').innerText = `PALETE: ${obj.palete} UN`;
+      document.getElementById('badgeMoove').innerText = `MOOVE: ${obj.moove || '-'}`;
+      document.getElementById('badgePax').innerText = `PAX: ${obj.pax || '-'}`;
+      document.getElementById('badgePalete').innerText = `FATOR: ${obj.palete} UN`;
       document.getElementById('resBusca').innerHTML = '';
       document.getElementById('formPlano').classList.remove('hidden');
+      document.getElementById('btnAbrir').classList.remove('hidden');
+      
+      document.getElementById('dataProd').value = new Date().toISOString().split('T')[0];
     }
 
     async function abrirPlano() {
@@ -114,26 +170,28 @@
       const linha = document.getElementById('linhaEnvase').value;
       const qtd = document.getElementById('qtdPlan').value;
       
-      if(!item || !lote || !dataF || !linha || !qtd) return Swal.fire('Atenção','Preencha todos os campos, incluindo a Linha de Envase.','warning');
+      if(!item || !lote || !dataF || !linha || !qtd) return Swal.fire('Atenção','Preencha todos os campos obrigatórios (*), incluindo a Linha de Envase.','warning');
       
-      Swal.fire({title: 'Abrindo Plano...', didOpen:()=>Swal.showLoading()});
+      Swal.fire({title: 'Criando Plano...', allowOutsideClick: false, didOpen:()=>Swal.showLoading()});
       const user = JSON.parse(localStorage.getItem('flowWmsUser')) || {nome:'S/N'};
       const {error} = await client.from('wms_planos_producao').insert([{ n_item: item, lote: lote, data_fabricacao: dataF, linha_envase: linha, qtd_planejada: qtd, criado_por: user.nome }]);
       
       if(error) return Swal.fire('Erro', error.message, 'error');
-      Swal.fire({title: 'Sucesso', text: 'Plano Aberto! A logística já pode iniciar a puxada.', icon: 'success', timer: 1500, showConfirmButton: false});
+      
+      Swal.fire({title: 'Sucesso', text: 'Plano Ativo! A logística já pode iniciar a puxada.', icon: 'success', timer: 2000, showConfirmButton: false});
       
       document.getElementById('formPlano').classList.add('hidden');
+      document.getElementById('btnAbrir').classList.add('hidden');
       document.getElementById('loteProd').value = ''; document.getElementById('qtdPlan').value = ''; document.getElementById('buscaProd').value = ''; document.getElementById('linhaEnvase').value = '';
       carregarPlanos();
     }
 
     async function carregarPlanos() {
       const tb = document.getElementById('listaPlanos');
-      tb.innerHTML = '<div class="text-center text-slate-400 py-10 font-bold"><i class="fa-solid fa-circle-notch fa-spin"></i> Carregando...</div>';
-      // A produção só vê os que estão EM ANDAMENTO
+      tb.innerHTML = '<div class="text-center text-slate-400 py-20 font-bold"><i class="fa-solid fa-circle-notch fa-spin text-3xl mb-3"></i><br>Carregando...</div>';
+      
       const {data, error} = await client.from('wms_planos_producao').select('*').eq('status','EM ANDAMENTO').order('id',{ascending:false});
-      if(error || !data.length) return tb.innerHTML = '<div class="text-center text-slate-400 py-10 font-bold border-2 border-dashed border-slate-200 rounded-xl">Nenhum plano em andamento no momento.</div>';
+      if(error || !data || !data.length) return tb.innerHTML = '<div class="text-center text-slate-400 py-20 font-bold border-2 border-dashed border-slate-300 rounded-2xl bg-white"><i class="fa-solid fa-mug-hot text-4xl mb-4 text-slate-300"></i><br>Nenhuma produção em andamento no momento.</div>';
       
       const { data: prodData } = await client.from('produtos_moove').select('n_item, descricao');
       let dictProd = {}; if(prodData) prodData.forEach(p => dictProd[p.n_item] = p.descricao);
@@ -142,21 +200,24 @@
       data.forEach(p => {
         let df = p.data_fabricacao.split('-').reverse().join('/');
         let desc = dictProd[p.n_item] || 'Descrição Indisponível';
-        let linhaTag = p.linha_envase ? `<span class="bg-amber-100 text-amber-700 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest"><i class="fa-solid fa-industry"></i> ${p.linha_envase}</span>` : '';
+        let linhaTag = p.linha_envase ? `<span class="bg-amber-100 text-amber-700 px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border border-amber-200"><i class="fa-solid fa-industry mr-1"></i> ${p.linha_envase}</span>` : '';
         
         html += `
-          <div class="bg-white border border-slate-200 rounded-xl p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:shadow-md transition-shadow group">
-            <div class="flex-1">
-              <div class="flex items-center gap-2 mb-2">
-                <span class="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest">Plano #${p.id}</span>
-                <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest border border-slate-200 px-2 py-0.5 rounded">LOTE: ${p.lote}</span>
+          <div class="bg-white border border-slate-200 rounded-2xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:shadow-md transition-shadow group">
+            <div class="flex-1 w-full">
+              <div class="flex flex-wrap items-center gap-2 mb-3">
+                <span class="bg-indigo-600 text-white px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest shadow-sm">#${p.id}</span>
+                <span class="text-[10px] font-black text-blue-600 uppercase tracking-widest border border-blue-200 bg-blue-50 px-2 py-1 rounded-lg">LOTE: ${p.lote}</span>
                 ${linhaTag}
               </div>
-              <h3 class="font-black text-slate-800 text-sm leading-tight">${p.n_item} - ${desc}</h3>
-              <p class="text-[10px] font-bold text-slate-500 mt-1 uppercase tracking-widest">Plan: <span class="text-indigo-600">${p.qtd_planejada} UN</span> | Fab: ${df}</p>
+              <h3 class="font-black text-slate-800 text-sm leading-tight mb-2"><span class="text-slate-400 font-bold mr-1">${p.n_item}</span> ${desc}</h3>
+              <div class="flex items-center gap-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                  <span class="bg-slate-50 px-2 py-1 border border-slate-100 rounded">Planejado: <span class="text-indigo-600 font-black text-xs">${p.qtd_planejada} UN</span></span>
+                  <span>Fab: ${df}</span>
+              </div>
             </div>
-            <button onclick="encerrarPlano(${p.id})" class="bg-slate-100 border border-slate-200 hover:bg-slate-800 text-slate-600 hover:text-white px-5 py-3 rounded-xl text-xs font-bold whitespace-nowrap shadow-sm w-full md:w-auto transition-colors">
-              Encerrar Envase <i class="fa-solid fa-flag-checkered ml-1"></i>
+            <button onclick="encerrarPlano(${p.id}, '${p.lote}')" class="bg-slate-800 hover:bg-black text-white px-6 py-4 rounded-xl text-xs font-black whitespace-nowrap shadow-md w-full md:w-auto transition-transform active:scale-95 flex items-center justify-center gap-2 uppercase tracking-wide">
+              Encerrar Envase <i class="fa-solid fa-flag-checkered"></i>
             </button>
           </div>
         `;
@@ -164,23 +225,34 @@
       tb.innerHTML = html;
     }
 
-    async function encerrarPlano(id) {
+    async function encerrarPlano(id, lote) {
       const {value: finalQtd} = await Swal.fire({
-        title: 'Encerrar Envase',
-        html: '<p class="text-sm text-slate-500 mb-2">Informe a quantidade FÍSICA REAL produzida neste lote:</p>',
-        input: 'number', showCancelButton: true, confirmButtonText: 'Declarar e Encerrar', confirmButtonColor: '#4f46e5', cancelButtonText: 'Cancelar'
+        title: 'Encerrar Lote',
+        html: `
+            <div class="text-left bg-slate-50 p-4 border border-slate-200 rounded-xl mb-4">
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Apontamento Final</p>
+                <p class="text-sm font-bold text-slate-700">Lote <span class="text-indigo-600 font-black">${lote}</span> encerrou a produção.</p>
+                <p class="text-xs text-slate-500 mt-2">Informe a quantidade <b class="text-slate-800">FÍSICA REAL</b> produzida que consta no ERP para enviar ao FUP Logístico.</p>
+            </div>
+        `,
+        input: 'number', 
+        inputAttributes: { min: 1, step: 1 },
+        showCancelButton: true, 
+        confirmButtonText: '<i class="fa-solid fa-check mr-1"></i> Declarar e Encerrar', 
+        confirmButtonColor: '#4f46e5', 
+        cancelButtonText: 'Cancelar',
+        customClass: { input: 'text-center font-black text-2xl text-indigo-700' }
       });
 
       if(finalQtd) {
-        Swal.fire({title: 'Processando...', didOpen:()=>Swal.showLoading(), allowOutsideClick: false});
+        Swal.fire({title: 'Processando...', allowOutsideClick: false, didOpen:()=>Swal.showLoading()});
         const user = JSON.parse(localStorage.getItem('flowWmsUser')) || {nome:'S/N'};
         
-        // A produção encerra. Vai para Fechamento FUP. PDA Puxada continua vendo.
         await client.from('wms_planos_producao').update({
           qtd_declarada_fim: Number(finalQtd), status: 'AGUARDANDO FECHAMENTO', closed_at: new Date().toISOString()
         }).eq('id', id);
 
-        Swal.fire('Registrado!','O lote foi encerrado pela produção e enviado para o FUP de Fechamento de Custódia da Logística.','success');
+        Swal.fire('Envase Encerrado!','O lote foi enviado para a fila de Auditoria (FUP) da Logística para o recebimento de custódia.','success');
         carregarPlanos();
       }
     }

@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Logístico | Produtividade WMS</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #f4f7fe; color: #1e293b; padding: 1.5rem; }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+    
+    .card-dash { background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03); transition: transform 0.2s, box-shadow 0.2s; }
+    .card-dash:hover { box-shadow: 0 10px 25px rgba(0, 0, 0, 0.06); }
+    
+    .kpi-title { font-size: 0.65rem; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+    .kpi-value { font-size: 2.2rem; font-weight: 900; color: #0f172a; line-height: 1.1; }
+    
+    .input-pill { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 12px; font-size: 0.75rem; font-weight: 700; color: #334155; outline: none; transition: all 0.2s; cursor: pointer; }
+    .input-pill:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1); background: #fff; }
+
+    .heatmap-table { width: 100%; border-collapse: separate; border-spacing: 4px; min-width: 1100px; }
+    .heatmap-th { color: #475569; font-size: 10px; font-weight: 900; padding: 12px 4px; text-align: center; border-radius: 8px; text-transform: uppercase; letter-spacing: 0.5px; background: #f8fafc; border: 1px solid #e2e8f0;}
+    .heatmap-cell { width: 40px; height: 40px; text-align: center; vertical-align: middle; font-size: 11px; font-weight: 900; border-radius: 8px; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); cursor: crosshair; }
+    .heatmap-cell:hover { transform: scale(1.15) translateY(-2px); z-index: 50; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.15); filter: brightness(1.1); border: 2px solid #0f172a !important; }
+    
+    .col-fixa { position: sticky; left: 0; background: #ffffff; z-index: 20; text-align: left; padding-left: 16px; min-width: 220px; font-weight: 800; font-size: 12px; color: #1e293b; border-radius: 8px; box-shadow: 4px 0 10px -5px rgba(0,0,0,0.05); }
+    .col-total { position: sticky; right: 0; background: #0f172a !important; color: white !important; z-index: 20; border-radius: 8px; box-shadow: -4px 0 10px -5px rgba(0,0,0,0.15); }
+  </style>
+</head>
+<body class="antialiased">
+
+  <div class="max-w-[1600px] mx-auto flex flex-col gap-5 pb-10">
+
+    <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-2">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center text-xl shadow-lg shadow-indigo-600/30"><i class="fa-solid fa-stopwatch-20"></i></div>
+        <div>
+          <h1 class="text-2xl font-black text-slate-800 tracking-tight leading-none">Torre de Controle Operacional</h1>
+          <p class="text-slate-500 font-bold text-xs mt-1" id="lbl-operacao">Análise de Produtividade, Turnos e Velocidade do Time</p>
+        </div>
+      </div>
+      
+      <div class="flex flex-wrap items-center gap-3 bg-white p-2 rounded-2xl shadow-sm border border-slate-200">
+        <div class="flex items-center gap-2 pl-2">
+            <i class="fa-regular fa-calendar text-slate-400"></i>
+            <input type="date" id="filtroData" class="text-sm font-black text-slate-700 border-none outline-none bg-transparent cursor-pointer" onchange="carregarDashboard()">
+        </div>
+        <div class="border-l border-slate-200 h-6 mx-2"></div>
+        <select id="filtroAtividade" class="input-pill border-none bg-transparent" onchange="carregarDashboard()">
+          <option value="TODOS">Visão Geral (Todas as Atividades)</option>
+          <option value="PUXADA">Apenas Puxada de P.A.</option>
+          <option value="ARMAZENAGEM">Apenas Armazenagem (Putaway)</option>
+          <option value="PICKING">Apenas Separação (Picking)</option>
+          <option value="CONFERENCIA">Apenas Conferência (Packing)</option>
+          <option value="LOADING">Apenas Carregamento (Loading)</option>
+        </select>
+        <button onclick="carregarDashboard()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-xl font-black text-xs shadow-md transition-transform active:scale-95 flex items-center gap-2 ml-2"><i class="fa-solid fa-rotate-right"></i> Processar</button>
+      </div>
+    </div>
+
+    <!-- KPIS PRINCIPAIS -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="card-dash p-6 relative overflow-hidden group">
+        <h3 class="kpi-title">Movimentos Realizados (Paletes) <span class="kpi-icon bg-blue-100 text-blue-500 absolute top-5 right-5"><i class="fa-solid fa-barcode"></i></span></h3>
+        <p class="kpi-value mt-3 text-blue-600 text-4xl" id="kpi-movimentos">0</p>
+        <p class="text-[10px] font-bold text-slate-400 mt-2 uppercase tracking-widest" id="lbl-tipo-mov">Bipagens Totais (Geral)</p>
+      </div>
+      <div class="card-dash p-6 relative overflow-hidden">
+        <h3 class="kpi-title">Volume Operado (Peças) <span class="kpi-icon bg-emerald-100 text-emerald-500 absolute top-5 right-5"><i class="fa-solid fa-boxes-stacked"></i></span></h3>
+        <p class="kpi-value mt-3 text-4xl text-slate-800" id="kpi-pecas">0</p>
+        <p class="text-[10px] font-bold text-slate-400 mt-2 uppercase tracking-widest">Conversão do palete</p>
+      </div>
+      <div class="card-dash p-6 relative overflow-hidden">
+        <h3 class="kpi-title">Operadores Envolvidos <span class="kpi-icon bg-indigo-100 text-indigo-500 absolute top-5 right-5"><i class="fa-solid fa-users"></i></span></h3>
+        <p class="kpi-value mt-3 text-4xl text-slate-800" id="kpi-operadores">0</p>
+        <p class="text-[10px] font-bold text-slate-400 mt-2 uppercase tracking-widest">Usuários únicos logados</p>
+      </div>
+      <div class="card-dash p-6 relative overflow-hidden border-l-4 border-l-amber-500 bg-amber-50/30">
+        <h3 class="kpi-title text-amber-700">Velocidade Média Global <span class="kpi-icon bg-amber-100 text-amber-500 absolute top-5 right-5"><i class="fa-solid fa-gauge-high"></i></span></h3>
+        <div class="flex items-baseline gap-2 mt-3">
+            <p class="kpi-value text-4xl text-amber-600" id="kpi-velocidade">0</p>
+            <span class="text-xs font-black text-amber-500">Mov / Hora</span>
+        </div>
+        <p class="text-[10px] font-bold text-amber-500 mt-2 uppercase tracking-widest">Ritmo da sua operação</p>
+      </div>
+    </div>
+
+    <!-- ANÁLISE POR TURNO (T1, T2, T3) -->
+    <div class="card-dash p-6 flex flex-col justify-center bg-white border-t-4 border-t-slate-800">
+      <h2 class="text-sm font-black text-slate-800 mb-5 flex items-center gap-2 uppercase tracking-widest"><i class="fa-solid fa-business-time text-slate-500"></i> Desempenho e Divisão de Turnos</h2>
+      
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        
+        <!-- T1 (Manhã) -->
+        <div class="bg-blue-50/50 rounded-xl p-5 border border-blue-100 relative">
+            <div class="flex justify-between items-center mb-3">
+                <span class="bg-blue-100 text-blue-700 font-black text-[10px] uppercase px-3 py-1 rounded-full border border-blue-200">TURNO T1</span>
+                <span class="text-[10px] font-black text-blue-400 tracking-widest">06h às 14h</span>
+            </div>
+            <div class="flex items-baseline gap-2">
+                <span class="text-4xl font-black text-slate-800" id="t1-movs">0</span>
+                <span class="text-[10px] font-black text-slate-400 uppercase">Movimentos</span>
+            </div>
+            <div class="mt-4 pt-3 border-t border-blue-100 flex justify-between items-end">
+                <div class="flex flex-col">
+                  <span class="text-xs font-bold text-slate-500 mb-1"><i class="fa-solid fa-boxes-stacked mr-1"></i> <span id="t1-pecas">0</span> Peças</span>
+                  <span class="text-[10px] font-black text-blue-500 uppercase tracking-widest">Ritmo: <span id="t1-hh" class="text-xs">0</span> Mov/h</span>
+                </div>
+                <span class="text-xs font-black text-blue-600 bg-white px-2 py-0.5 rounded shadow-sm" id="t1-pct">0%</span>
+            </div>
+        </div>
+
+        <!-- T2 (Tarde) -->
+        <div class="bg-amber-50/50 rounded-xl p-5 border border-amber-100 relative">
+            <div class="flex justify-between items-center mb-3">
+                <span class="bg-amber-100 text-amber-700 font-black text-[10px] uppercase px-3 py-1 rounded-full border border-amber-200">TURNO T2</span>
+                <span class="text-[10px] font-black text-amber-400 tracking-widest">14h às 22h</span>
+            </div>
+            <div class="flex items-baseline gap-2">
+                <span class="text-4xl font-black text-slate-800" id="t2-movs">0</span>
+                <span class="text-[10px] font-black text-slate-400 uppercase">Movimentos</span>
+            </div>
+            <div class="mt-4 pt-3 border-t border-amber-100 flex justify-between items-end">
+                <div class="flex flex-col">
+                  <span class="text-xs font-bold text-slate-500 mb-1"><i class="fa-solid fa-boxes-stacked mr-1"></i> <span id="t2-pecas">0</span> Peças</span>
+                  <span class="text-[10px] font-black text-amber-600 uppercase tracking-widest">Ritmo: <span id="t2-hh" class="text-xs">0</span> Mov/h</span>
+                </div>
+                <span class="text-xs font-black text-amber-600 bg-white px-2 py-0.5 rounded shadow-sm" id="t2-pct">0%</span>
+            </div>
+        </div>
+
+        <!-- T3 (Noite/Madrugada) -->
+        <div class="bg-indigo-50/50 rounded-xl p-5 border border-indigo-100 relative">
+            <div class="flex justify-between items-center mb-3">
+                <span class="bg-indigo-100 text-indigo-700 font-black text-[10px] uppercase px-3 py-1 rounded-full border border-indigo-200">TURNO T3</span>
+                <span class="text-[10px] font-black text-indigo-400 tracking-widest">22h às 06h</span>
+            </div>
+            <div class="flex items-baseline gap-2">
+                <span class="text-4xl font-black text-slate-800" id="t3-movs">0</span>
+                <span class="text-[10px] font-black text-slate-400 uppercase">Movimentos</span>
+            </div>
+            <div class="mt-4 pt-3 border-t border-indigo-100 flex justify-between items-end">
+                <div class="flex flex-col">
+                  <span class="text-xs font-bold text-slate-500 mb-1"><i class="fa-solid fa-boxes-stacked mr-1"></i> <span id="t3-pecas">0</span> Peças</span>
+                  <span class="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Ritmo: <span id="t3-hh" class="text-xs">0</span> Mov/h</span>
+                </div>
+                <span class="text-xs font-black text-indigo-600 bg-white px-2 py-0.5 rounded shadow-sm" id="t3-pct">0%</span>
+            </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- HEATMAP (CALOR OPERACIONAL HORA A HORA) -->
+    <div class="card-dash bg-white overflow-hidden pb-2">
+      <div class="bg-slate-50 border-b border-slate-200 p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+            <h3 class="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2"><i class="fa-solid fa-fire text-orange-500"></i> Heatmap de Produtividade</h3>
+            <p class="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">Acompanhe a constância ou a oscilação do ritmo hora a hora.</p>
+        </div>
+        <div class="flex items-center gap-3 bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm">
+            <button id="btn-visao-mov" onclick="mudarVisaoHeatmap('MOV')" class="px-4 py-2 rounded-lg text-xs font-black bg-slate-800 text-white transition-colors">Movimentos</button>
+            <button id="btn-visao-vol" onclick="mudarVisaoHeatmap('VOL')" class="px-4 py-2 rounded-lg text-xs font-black text-slate-500 hover:text-slate-800 transition-colors">Volume (Pçs)</button>
+        </div>
+      </div>
+      <div class="p-5 max-h-[550px] overflow-y-auto custom-scrollbar overflow-x-auto" id="container-heatmap">
+         <div class="text-center py-16 font-bold text-slate-400 text-lg"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Compilando rastro logístico...</div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const client = window.supabase.createClient('https://cbrwmscaidyeaamyfiyt.supabase.co', 'sb_publishable_neiGbVa2X1nBfX5wT3UGYw_3RWe43_G');
+    let dadosGlobaisBase = [];
+    let usuariosMapHeatmap = {}; 
+    let visaoAtual = 'MOV';
+
+    document.getElementById('filtroData').value = new Date().toISOString().split('T')[0];
+    carregarDashboard();
+
+    function mudarVisaoHeatmap(tipo) {
+        visaoAtual = tipo;
+        if(tipo === 'MOV') {
+            document.getElementById('btn-visao-mov').className = "px-4 py-2 rounded-lg text-xs font-black bg-slate-800 text-white transition-colors shadow-sm";
+            document.getElementById('btn-visao-vol').className = "px-4 py-2 rounded-lg text-xs font-black text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors";
+        } else {
+            document.getElementById('btn-visao-vol').className = "px-4 py-2 rounded-lg text-xs font-black bg-emerald-600 text-white transition-colors shadow-sm";
+            document.getElementById('btn-visao-mov').className = "px-4 py-2 rounded-lg text-xs font-black text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors";
+        }
+        renderizarHeatmap();
+    }
+
+    async function carregarDashboard() {
+      Swal.fire({ title: 'Analisando Produtividade...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+      
+      const dataFiltro = document.getElementById('filtroData').value;
+      const atividadeFiltro = document.getElementById('filtroAtividade').value;
+
+      let lblAtividade = "Bipagens Totais (Geral)";
+      if (atividadeFiltro === "PUXADA") lblAtividade = "Apenas Puxada de Produção";
+      if (atividadeFiltro === "ARMAZENAGEM") lblAtividade = "Apenas Endereçamento";
+      if (atividadeFiltro === "PICKING") lblAtividade = "Apenas Separação";
+      if (atividadeFiltro === "CONFERENCIA") lblAtividade = "Apenas Packing";
+      if (atividadeFiltro === "LOADING") lblAtividade = "Apenas Carregamento";
+      document.getElementById('lbl-tipo-mov').innerText = lblAtividade;
+
+      try {
+        const { data: paletes, error } = await client.from('wms_paletes')
+          .select('qtd, recebido_por, recebido_em, armazenado_por, armazenado_em, picking_por, conf_por, load_por, updated_at')
+          .or(`recebido_em.gte.${dataFiltro}T00:00:00.000Z,armazenado_em.gte.${dataFiltro}T00:00:00.000Z,updated_at.gte.${dataFiltro}T00:00:00.000Z`);
+
+        if (error) throw error;
+
+        let totalMovsGlobais = 0;
+        let totalPecasGlobais = 0;
+        let setUsuariosUnicos = new Set();
+        
+        let turnos = {
+            t1: { movs: 0, pecas: 0 },
+            t2: { movs: 0, pecas: 0 },
+            t3: { movs: 0, pecas: 0 }
+        };
+
+        usuariosMapHeatmap = {};
+
+        function computarAcao(usuario, stringDataIso, qtdPecas) {
+            if(!usuario || usuario.trim() === '' || usuario === 'null') return;
+            if(!stringDataIso || !stringDataIso.startsWith(dataFiltro)) return;
+
+            let objData = new Date(stringDataIso);
+            let hora = objData.getHours();
+
+            let uUpper = usuario.trim().toUpperCase();
+            setUsuariosUnicos.add(uUpper);
+
+            totalMovsGlobais++;
+            totalPecasGlobais += parseFloat(qtdPecas);
+
+            if (hora >= 6 && hora < 14) { turnos.t1.movs++; turnos.t1.pecas += parseFloat(qtdPecas); }
+            else if (hora >= 14 && hora < 22) { turnos.t2.movs++; turnos.t2.pecas += parseFloat(qtdPecas); }
+            else { turnos.t3.movs++; turnos.t3.pecas += parseFloat(qtdPecas); } 
+
+            if (!usuariosMapHeatmap[uUpper]) {
+                usuariosMapHeatmap[uUpper] = {};
+                for(let i=0; i<24; i++) usuariosMapHeatmap[uUpper][i] = { movs: 0, vol: 0 };
+            }
+            usuariosMapHeatmap[uUpper][hora].movs++;
+            usuariosMapHeatmap[uUpper][hora].vol += parseFloat(qtdPecas);
+        }
+
+        if(paletes) {
+            paletes.forEach(p => {
+                let pQtd = parseFloat(p.qtd) || 0;
+                
+                if(atividadeFiltro === "TODOS" || atividadeFiltro === "PUXADA") {
+                    if(p.recebido_por) computarAcao(p.recebido_por, p.recebido_em, pQtd);
+                }
+                
+                if(atividadeFiltro === "TODOS" || atividadeFiltro === "ARMAZENAGEM") {
+                    if(p.armazenado_por) computarAcao(p.armazenado_por, p.armazenado_em, pQtd);
+                }
+                
+                if(atividadeFiltro === "TODOS" || atividadeFiltro === "PICKING") {
+                    if(p.picking_por) computarAcao(p.picking_por, p.updated_at, pQtd); 
+                }
+
+                if(atividadeFiltro === "TODOS" || atividadeFiltro === "CONFERENCIA") {
+                    if(p.conf_por) computarAcao(p.conf_por, p.updated_at, pQtd);
+                }
+
+                if(atividadeFiltro === "TODOS" || atividadeFiltro === "LOADING") {
+                    if(p.load_por) computarAcao(p.load_por, p.updated_at, pQtd);
+                }
+            });
+        }
+
+        // CÁLCULO REAL DE VELOCIDADE (RUN RATE H/H)
+        let agora = new Date();
+        let dataHojeString = agora.toISOString().split('T')[0];
+        
+        let divisorGeral = 24;
+        let divT1 = 8, divT2 = 8, divT3 = 8;
+
+        // Se estivermos olhando para o dia de HOJE, o divisor é quebrado pelos minutos corridos
+        if (dataFiltro === dataHojeString) {
+            let h = agora.getHours();
+            let m = agora.getMinutes() / 60;
+            let timeFloat = h + m;
+
+            divisorGeral = timeFloat;
+
+            // Turno 1 (06:00 as 14:00)
+            if (timeFloat < 6) divT1 = 0.1;
+            else if (timeFloat < 14) divT1 = timeFloat - 6;
+            else divT1 = 8;
+
+            // Turno 2 (14:00 as 22:00)
+            if (timeFloat < 14) divT2 = 0.1;
+            else if (timeFloat < 22) divT2 = timeFloat - 14;
+            else divT2 = 8;
+
+            // Turno 3 (22:00 as 06:00 e 00:00 as 06:00) -> Conta apenas as hrs do mesmo dia corrente
+            if (timeFloat < 6) divT3 = timeFloat;
+            else if (timeFloat < 22) divT3 = 6;
+            else divT3 = 6 + (timeFloat - 22);
+
+            // Previne falhas de divisão por zero
+            if (divisorGeral < 0.1) divisorGeral = 0.1;
+            if (divT1 < 0.1) divT1 = 0.1;
+            if (divT2 < 0.1) divT2 = 0.1;
+            if (divT3 < 0.1) divT3 = 0.1;
+        }
+
+        // CÁLCULOS KPI TOP
+        document.getElementById('kpi-movimentos').innerText = totalMovsGlobais.toLocaleString('pt-BR');
+        document.getElementById('kpi-pecas').innerText = totalPecasGlobais.toLocaleString('pt-BR');
+        document.getElementById('kpi-operadores').innerText = setUsuariosUnicos.size;
+
+        let velMediaGeral = totalMovsGlobais / divisorGeral;
+        document.getElementById('kpi-velocidade').innerText = velMediaGeral.toFixed(1);
+
+        // CÁLCULOS DOS TURNOS
+        let hhT1 = turnos.t1.movs === 0 ? 0 : turnos.t1.movs / divT1;
+        document.getElementById('t1-movs').innerText = turnos.t1.movs.toLocaleString('pt-BR');
+        document.getElementById('t1-pecas').innerText = turnos.t1.pecas.toLocaleString('pt-BR');
+        document.getElementById('t1-hh').innerText = hhT1.toFixed(1);
+        let pctT1 = totalMovsGlobais > 0 ? ((turnos.t1.movs / totalMovsGlobais) * 100).toFixed(1) : 0;
+        document.getElementById('t1-pct').innerText = pctT1 + '%';
+
+        let hhT2 = turnos.t2.movs === 0 ? 0 : turnos.t2.movs / divT2;
+        document.getElementById('t2-movs').innerText = turnos.t2.movs.toLocaleString('pt-BR');
+        document.getElementById('t2-pecas').innerText = turnos.t2.pecas.toLocaleString('pt-BR');
+        document.getElementById('t2-hh').innerText = hhT2.toFixed(1);
+        let pctT2 = totalMovsGlobais > 0 ? ((turnos.t2.movs / totalMovsGlobais) * 100).toFixed(1) : 0;
+        document.getElementById('t2-pct').innerText = pctT2 + '%';
+
+        let hhT3 = turnos.t3.movs === 0 ? 0 : turnos.t3.movs / divT3;
+        document.getElementById('t3-movs').innerText = turnos.t3.movs.toLocaleString('pt-BR');
+        document.getElementById('t3-pecas').innerText = turnos.t3.pecas.toLocaleString('pt-BR');
+        document.getElementById('t3-hh').innerText = hhT3.toFixed(1);
+        let pctT3 = totalMovsGlobais > 0 ? ((turnos.t3.movs / totalMovsGlobais) * 100).toFixed(1) : 0;
+        document.getElementById('t3-pct').innerText = pctT3 + '%';
+
+        renderizarHeatmap();
+        Swal.close();
+
+      } catch (err) { Swal.fire('Erro', err.message, 'error'); }
+    }
+
+    function renderizarHeatmap() {
+      const container = document.getElementById('container-heatmap');
+      let operariosArray = Object.keys(usuariosMapHeatmap);
+
+      if (operariosArray.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-20 bg-slate-50/50 rounded-2xl border border-dashed border-slate-300">
+            <div class="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm border border-slate-100"><i class="fa-solid fa-mug-hot text-3xl text-slate-300"></i></div>
+            <h3 class="text-lg font-black text-slate-600 mb-1">Nenhum Rastro Operacional</h3>
+            <p class="text-slate-400 font-bold text-xs uppercase tracking-widest">Nenhuma produtividade encontrada no filtro atual.</p>
+          </div>`;
+        return;
+      }
+
+      operariosArray.sort((a,b) => a.localeCompare(b));
+
+      let maxValorGlobal = 0;
+      operariosArray.forEach(u => {
+        for (let h = 0; h < 24; h++) {
+          let val = visaoAtual === 'MOV' ? usuariosMapHeatmap[u][h].movs : usuariosMapHeatmap[u][h].vol;
+          if (val > maxValorGlobal) maxValorGlobal = val;
+        }
+      });
+
+      if(maxValorGlobal === 0) maxValorGlobal = 1;
+
+      let html = `<table class="heatmap-table"><thead><tr>`;
+      html += `<th class="col-fixa bg-white shadow-none">Operador Responsável</th>`;
+      
+      for (let i = 0; i < 24; i++) {
+        let hFmt = i.toString().padStart(2, '0') + "h";
+        let corBgCabecalho = "#f8fafc";
+        if(i >= 6 && i < 14) corBgCabecalho = "#eff6ff"; 
+        if(i >= 14 && i < 22) corBgCabecalho = "#fffbeb"; 
+        if(i >= 22 || i < 6) corBgCabecalho = "#eef2ff"; 
+        html += `<th class="heatmap-th" style="background-color: ${corBgCabecalho};">${hFmt}</th>`;
+      }
+      html += `<th class="heatmap-th col-total">Total Dia</th></tr></thead><tbody>`;
+
+      operariosArray.forEach(u => {
+        html += `<tr>`;
+        html += `<td class="col-fixa"><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 shrink-0 border border-slate-200"><i class="fa-solid fa-user-astronaut text-xs"></i></div> <span class="truncate uppercase text-xs">${u}</span></div></td>`;
+        
+        let somaLinha = 0;
+
+        for (let h = 0; h < 24; h++) {
+          let celulaInfo = usuariosMapHeatmap[u][h];
+          let val = visaoAtual === 'MOV' ? celulaInfo.movs : celulaInfo.vol;
+          somaLinha += val;
+
+          let corBg = "#f8fafc"; 
+          let corTexto = "transparent"; 
+          let borderCustom = "border: 1px solid #f1f5f9;";
+          let textoExibicao = "·";
+
+          if (val > 0) {
+            borderCustom = "border: 1px solid transparent;";
+            let intensidade = Math.max(0.15, val / maxValorGlobal); 
+            corTexto = "#ffffff";
+            
+            if (visaoAtual === 'MOV') {
+                corBg = `rgba(245, 158, 11, ${intensidade})`; 
+                if (intensidade < 0.40) corTexto = "#92400e"; 
+            } else {
+                corBg = `rgba(16, 185, 129, ${intensidade})`; 
+                if (intensidade < 0.40) corTexto = "#064e3b";
+            }
+            
+            textoExibicao = val > 9999 ? (val/1000).toFixed(1) + 'k' : val;
+          }
+
+          html += `<td class="heatmap-cell" style="background-color: ${corBg}; color: ${corTexto}; ${borderCustom}" title="${val} ${visaoAtual==='MOV' ? 'Movimentos' : 'Peças'} - ${h}h">${textoExibicao}</td>`;
+        }
+
+        let displayTotal = somaLinha > 9999 ? (somaLinha/1000).toFixed(1) + 'k' : somaLinha.toLocaleString('pt-BR');
+        html += `<td class="heatmap-cell col-total bg-slate-800 text-white">${displayTotal}</td>`;
+        html += `</tr>`;
+      });
+
+      html += `</tbody></table>`;
+      container.innerHTML = html;
+    }
+  </script>
+</body>
+</html>

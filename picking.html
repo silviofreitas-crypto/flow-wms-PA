@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
+    .input-pda { width: 100%; background: #f8fafc; border: 2px solid #cbd5e1; font-weight: 900; font-size: 1.25rem; text-align: center; border-radius: 0.75rem; padding: 0.75rem; outline: none; transition: border 0.2s; color: #0f172a; text-transform: uppercase; }
+    .input-pda:focus { border-color: #f59e0b; background: #fff; box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2); }
+    input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    .check-btn { transition: all 0.2s ease; cursor: pointer; user-select: none; }
+    .check-btn.checked { background-color: #ecfdf5 !important; border-color: #10b981 !important; color: #047857 !important; }
+    .check-btn.checked .icon-check { color: #10b981 !important; }
+    .chk-pda { display: none; }
+  </style>
+</head>
+<body class="md:p-8 flex justify-center items-start min-h-screen">
+  
+  <div class="w-full max-w-md bg-white md:rounded-3xl shadow-lg border border-slate-200 flex flex-col min-h-screen md:min-h-[auto]">
+    
+    <div class="bg-amber-500 p-4 text-white flex items-center gap-4 shrink-0 relative overflow-hidden md:rounded-t-3xl shadow-md">
+      <div class="absolute -right-4 -bottom-4 text-white opacity-10 text-6xl"><i class="fa-solid fa-route"></i></div>
+      <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center shrink-0 text-2xl relative z-10"><i class="fa-solid fa-route text-white"></i></div>
+      <div class="text-left relative z-10">
+        <h1 class="text-xl font-black tracking-tight leading-tight text-white">Picking Guiado</h1>
+        <p class="text-amber-100 text-[10px] font-bold uppercase tracking-widest mt-0.5">Rota Inteligente</p>
+      </div>
+    </div>
+
+    <!-- TELA 1: SELEÇÃO DA ONDA -->
+    <div id="telaSelecao" class="p-6 flex flex-col flex-1">
+      <div class="mb-4 flex justify-between items-end">
+        <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest">Selecione o Picking <span class="text-red-500">*</span></label>
+        <button onclick="carregarPickingsAtivos()" class="text-amber-600 hover:text-amber-700 text-[10px] font-black uppercase"><i class="fa-solid fa-rotate-right"></i> Atualizar</button>
+      </div>
+      <select id="selPicking" onchange="iniciarPickingGuiado()" class="w-full bg-slate-50 border-2 border-slate-200 text-slate-800 font-bold p-4 rounded-xl outline-none focus:border-amber-500 transition-colors cursor-pointer text-sm shadow-sm mb-6">
+        <option value="">Buscando ondas...</option>
+      </select>
+    </div>
+
+    <!-- TELA 2: EXECUÇÃO DO PICKING GUIADO -->
+    <div id="telaExecucao" class="hidden flex-col flex-1 relative bg-slate-50">
+      
+      <!-- Cabeçalho Rota -->
+      <div class="p-4 border-b border-slate-200 flex justify-between items-center bg-white shadow-sm z-10">
+        <span class="text-[11px] font-black text-blue-700 uppercase tracking-widest bg-blue-100 px-3 py-1.5 rounded-lg shadow-sm border border-blue-200" id="lblProgresso"><i class="fa-solid fa-list-ol mr-1"></i> Faltam: 0</span>
+        <button onclick="pularTarefa()" class="text-slate-500 hover:text-slate-700 font-black text-[11px] px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-lg shadow-sm active:scale-95 transition-transform uppercase"><i class="fa-solid fa-forward-step mr-1"></i> Pular Palete</button>
+      </div>
+      
+      <div class="p-4 flex-1 overflow-y-auto custom-scrollbar flex flex-col">
+        
+        <!-- ========================================== -->
+        <!-- PASSO 1: VALIDAR ENDEREÇO                  -->
+        <!-- ========================================== -->
+        <div id="passo1-endereco" class="flex flex-col flex-1 justify-center items-center">
+          <div class="bg-white border-2 border-amber-200 p-8 rounded-3xl shadow-lg text-center w-full max-w-sm relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-2 bg-amber-500"></div>
+            <span class="text-xs font-black text-amber-600 uppercase tracking-widest block mb-2"><i class="fa-solid fa-person-walking-arrow-right mr-1"></i> Caminhe até a Posição:</span>
+            <span class="text-5xl font-black text-slate-800 block mb-8" id="alvoEnd">A-01-05</span>
+            
+            <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">Bipar Endereço Origem <span class="text-red-500">*</span></label>
+            <input type="text" id="inpEnd" class="input-pda mb-6" placeholder="A-01-05">
+            
+            <button onclick="validarEndereco()" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-black text-lg py-4 rounded-xl shadow-lg shadow-amber-500/30 transition-transform active:scale-95 flex justify-center items-center gap-2">
+              <i class="fa-solid fa-location-crosshairs"></i> VALIDAR POSIÇÃO
+            </button>
+          </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- PASSO 2: EXTRAÇÃO E AUDITORIA DO ITEM      -->
+        <!-- ========================================== -->
+        <div id="passo2-coleta" class="hidden flex-col w-full">
+          <!-- CARD DO PRODUTO -->
+          <div class="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm text-center mb-4 relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-1 bg-emerald-500"></div>
+            <div class="inline-block bg-slate-100 px-3 py-1 rounded-lg border border-slate-200 mb-2">
+              <span class="text-[10px] font-black text-slate-400 uppercase mr-1">LPN-ALVO:</span>
+              <span class="text-sm font-black text-slate-800" id="alvoLpnHeader">LPN-XX-00</span>
+            </div>
+            <p class="font-black text-slate-800 text-sm leading-tight mb-2 px-2" id="alvoDesc">DESCRIÇÃO DO PRODUTO</p>
+          </div>
+
+          <!-- FORMULÁRIO -->
+          <div class="space-y-4">
+            
+            <!-- CHECKLIST VISUAL -->
+            <div>
+              <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1">1. Validação Visual <span class="text-red-500">*</span></label>
+              <div class="grid grid-cols-2 gap-3 mt-1">
+                <div id="btnCheckItem" onclick="toggleCheck('item')" class="check-btn bg-white border-2 border-slate-200 p-3 rounded-xl flex flex-col items-center justify-center shadow-sm">
+                  <i class="fa-solid fa-boxes-stacked icon-check text-slate-300 text-2xl mb-2"></i>
+                  <span class="text-[11px] font-black text-slate-600 uppercase mb-1">Produto Correto?</span>
+                  <div class="text-[9px] font-bold text-slate-400 leading-tight text-center bg-slate-50 p-1.5 rounded border border-slate-100 w-full">
+                    ELV: <span class="text-slate-700 font-black" id="ckElv"></span><br>
+                    MOV: <span class="text-slate-700" id="ckMov"></span><br>
+                    PAX: <span class="text-slate-700" id="ckPax"></span>
+                  </div>
+                </div>
+                <div id="btnCheckLote" onclick="toggleCheck('lote')" class="check-btn bg-white border-2 border-slate-200 p-3 rounded-xl flex flex-col items-center justify-center shadow-sm">
+                  <i class="fa-solid fa-box icon-check text-slate-300 text-2xl mb-2"></i>
+                  <span class="text-[11px] font-black text-slate-600 uppercase mb-1">Lote e Qtd</span>
+                  <div class="text-[10px] font-black text-slate-500 text-center bg-slate-50 p-1.5 rounded border border-slate-100 w-full mt-1">
+                    LOTE: <span class="text-blue-600" id="ckLote"></span><br>
+                    QTD: <span class="text-blue-600" id="ckQtd"></span>
+                  </div>
+                </div>
+              </div>
+              <input type="hidden" id="valCheckItem" value="0">
+              <input type="hidden" id="valCheckLote" value="0">
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1">2. Digitar Seq. <span class="text-red-500">*</span></label>
+                <input type="number" id="inpSeq" class="input-pda text-blue-600 bg-white" placeholder="000">
+              </div>
+              <div>
+                <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1">3. Qtd Real <span class="text-red-500">*</span></label>
+                <input type="number" id="inpQtd" class="input-pda bg-white" placeholder="0">
+              </div>
+            </div>
+            
+            <div>
+              <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1">4. Bipar LPN Colada <span class="text-red-500">*</span></label>
+              <input type="text" id="inpLpn" class="input-pda text-sm bg-white" placeholder="LPN...">
+            </div>
+            
+            <div class="pt-3 border-t border-slate-200">
+              <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1">5. Endereço Stage Destino <span class="text-red-500">*</span></label>
+              <input type="text" id="inpStage" class="input-pda border-blue-300 text-blue-700 bg-blue-50" placeholder="S-01, B-05...">
+            </div>
+
+            <div class="pt-4">
+              <button onclick="confirmarPicking()" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black text-lg py-5 rounded-2xl shadow-xl shadow-emerald-500/30 transition-transform active:scale-95 flex justify-center items-center gap-2">
+                <i class="fa-solid fa-check-double text-2xl"></i> CONFIRMAR SEPARAÇÃO
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const client = window.supabase.createClient('https://cbrwmscaidyeaamyfiyt.supabase.co', 'sb_publishable_neiGbVa2X1nBfX5wT3UGYw_3RWe43_G');
+    let tarefasFila = []; 
+    let tarefaAtual = null; 
+    let produtosGlobais = {}; 
+
+    window.onload = () => carregarPickingsAtivos();
+
+    async function carregarPickingsAtivos() {
+      const sel = document.getElementById('selPicking'); 
+      sel.innerHTML = '<option value="">Buscando...</option>';
+      
+      const {data: prods} = await client.from('produtos_moove').select('*');
+      if(prods) prods.forEach(p => produtosGlobais[p.n_item] = p);
+
+      const {data: cargas, error} = await client.from('wms_cargas')
+                                        .select('id, destino, cliente, wms_paletes(id, status_expedicao)')
+                                        .in('status', ['ROTEIRIZADA', 'SEPARACAO', 'CONFERENCIA', 'AG_LOADING'])
+                                        .order('id', {ascending: true});
+
+      if(error || !cargas || cargas.length === 0) {
+        sel.innerHTML = '<option value="">Nenhum Picking disponível</option>'; return;
+      }
+
+      let pickings = cargas.filter(c => c.wms_paletes.some(p => p.status_expedicao === 'PENDENTE_PICKING'));
+
+      if(pickings.length === 0) {
+        sel.innerHTML = '<option value="">Todos Pickings finalizados</option>'; return;
+      }
+
+      sel.innerHTML = '<option value="">-- SELECIONE A ONDA --</option>';
+      pickings.forEach(c => {
+        let pendentes = c.wms_paletes.filter(p => p.status_expedicao === 'PENDENTE_PICKING').length;
+        sel.innerHTML += `<option value="${c.id}">PICK #${c.id} - ${c.destino} (${pendentes} Tarefas)</option>`;
+      });
+    }
+
+    async function iniciarPickingGuiado() {
+      const cid = document.getElementById('selPicking').value; 
+      if(!cid) return;
+
+      Swal.fire({title: 'Calculando Rota...', allowOutsideClick: false, didOpen:()=>Swal.showLoading()});
+
+      const {data, error} = await client.from('wms_paletes').select('*').eq('carga_id', cid).eq('status_expedicao', 'PENDENTE_PICKING');
+      
+      if(error || !data || data.length === 0) {
+        Swal.fire('Concluído!', 'Este Picking não possui mais tarefas pendentes.', 'success');
+        await client.from('wms_cargas').update({status: 'CONFERENCIA'}).eq('id', cid).eq('status', 'ROTEIRIZADA');
+        carregarPickingsAtivos();
+        return;
+      }
+
+      // ORDENAÇÃO A-Z DO ENDEREÇO (ROTA GUIADA)
+      tarefasFila = data.sort((a, b) => (a.endereco || '').localeCompare(b.endereco || ''));
+      await client.from('wms_cargas').update({status: 'SEPARACAO'}).eq('id', cid).eq('status', 'ROTEIRIZADA');
+
+      Swal.close();
+      carregarProximaTarefa();
+    }
+
+    function carregarProximaTarefa() {
+      if(tarefasFila.length === 0) {
+        Swal.fire({title: 'Onda Finalizada!', text: 'Todos os paletes foram separados.', icon: 'success', confirmButtonColor: '#10b981'}).then(()=>{
+          document.getElementById('telaExecucao').classList.replace('flex', 'hidden');
+          document.getElementById('telaSelecao').classList.remove('hidden');
+          carregarPickingsAtivos();
+        });
+        return;
+      }
+
+      tarefaAtual = tarefasFila[0]; 
+
+      document.getElementById('telaSelecao').classList.add('hidden');
+      document.getElementById('telaExecucao').classList.replace('hidden', 'flex');
+      
+      // Reseta Telas do Wizard
+      document.getElementById('passo1-endereco').classList.remove('hidden');
+      document.getElementById('passo2-coleta').classList.add('hidden');
+      document.getElementById('passo1-endereco').classList.add('flex');
+
+      let prodInfo = produtosGlobais[tarefaAtual.n_item] || { descricao: 'S/ DESC', cod_moove: 'N/A', cod_pax: 'N/A' };
+
+      document.getElementById('lblProgresso').innerHTML = `<i class="fa-solid fa-list-ol mr-1"></i> Faltam: ${tarefasFila.length}`;
+      
+      // Passo 1 Info
+      document.getElementById('alvoEnd').innerText = tarefaAtual.endereco || 'S/ END';
+      document.getElementById('inpEnd').value = '';
+
+      // Passo 2 Info
+      document.getElementById('alvoDesc').innerText = `${tarefaAtual.n_item} - ${prodInfo.descricao}`;
+      document.getElementById('alvoLpnHeader').innerText = tarefaAtual.lpn_expedicao;
+
+      document.getElementById('ckElv').innerText = tarefaAtual.n_item;
+      document.getElementById('ckMov').innerText = prodInfo.cod_moove || 'N/A';
+      document.getElementById('ckPax').innerText = prodInfo.cod_pax || 'N/A';
+      document.getElementById('ckLote').innerText = tarefaAtual.lote;
+      document.getElementById('ckQtd').innerText = `${tarefaAtual.qtd} UN`;
+
+      // Reseta Inputs Passo 2
+      ['inpSeq','inpQtd','inpLpn','inpStage'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('valCheckItem').value = '0';
+      document.getElementById('valCheckLote').value = '0';
+      document.getElementById('btnCheckItem').classList.remove('checked');
+      document.getElementById('btnCheckLote').classList.remove('checked');
+      
+      setTimeout(() => document.getElementById('inpEnd').focus(), 100);
+    }
+
+    function validarEndereco() {
+      let vEnd = document.getElementById('inpEnd').value.trim().toUpperCase();
+      let enderecoOficial = (tarefaAtual.endereco || '').toUpperCase();
+      
+      // Se tiver endereço oficial, trava. Se for vazio ('S/ END'), deixa passar livre.
+      if(enderecoOficial && vEnd !== enderecoOficial) {
+        return Swal.fire('Local Incorreto', `Você deve ir para a posição: ${tarefaAtual.endereco}`, 'error');
+      }
+
+      // Transição Mágica para o Passo 2
+      document.getElementById('passo1-endereco').classList.add('hidden');
+      document.getElementById('passo1-endereco').classList.remove('flex');
+      document.getElementById('passo2-coleta').classList.remove('hidden');
+      document.getElementById('passo2-coleta').classList.add('flex');
+    }
+
+    function pularTarefa() {
+      if(tarefasFila.length <= 1) return Swal.fire('Atenção', 'Esta é a única tarefa restante na rota.', 'info');
+      let pulado = tarefasFila.shift();
+      tarefasFila.push(pulado);
+      const Toast = Swal.mixin({ toast: true, position: "top", showConfirmButton: false, timer: 1500 });
+      Toast.fire({ icon: "info", title: "Tarefa movida pro fim da fila." });
+      carregarProximaTarefa();
+    }
+
+    function toggleCheck(tipo) {
+      let valInput = document.getElementById(tipo === 'item' ? 'valCheckItem' : 'valCheckLote');
+      let btnDiv = document.getElementById(tipo === 'item' ? 'btnCheckItem' : 'btnCheckLote');
+      if(valInput.value === '0') {
+        valInput.value = '1'; btnDiv.classList.add('checked');
+      } else {
+        valInput.value = '0'; btnDiv.classList.remove('checked');
+      }
+    }
+
+    async function confirmarPicking() {
+      let cItem = document.getElementById('valCheckItem').value;
+      let cLote = document.getElementById('valCheckLote').value;
+      let vSeq = document.getElementById('inpSeq').value;
+      let vQtd = document.getElementById('inpQtd').value;
+      let vLpn = document.getElementById('inpLpn').value.trim().toUpperCase();
+      let vStage = document.getElementById('inpStage').value.trim().toUpperCase();
+
+      if(!vSeq || !vQtd || !vLpn || !vStage) return Swal.fire('Atenção', 'Preencha todos os campos.', 'warning');
+      if(cItem === '0' || cLote === '0') return Swal.fire('Check Visual Pendente', 'Você precisa confirmar visualmente o Produto e o Lote físico.', 'warning');
+      
+      if(parseInt(vSeq) !== parseInt(tarefaAtual.seq_producao)) return Swal.fire('Erro de FIFO', `Sequencial errado! Você deve pegar o Seq ${tarefaAtual.seq_producao}.`, 'error');
+      if(parseFloat(vQtd) !== parseFloat(tarefaAtual.qtd)) return Swal.fire('Erro de Quantidade', `Quantidade física divergente da registrada (${tarefaAtual.qtd}).`, 'error');
+      if(vLpn !== tarefaAtual.lpn_expedicao.toUpperCase()) return Swal.fire('Erro de LPN', `Você bipou a etiqueta LPN errada para este palete.`, 'error');
+
+      Swal.fire({title: 'Movendo...', allowOutsideClick: false, didOpen:()=>Swal.showLoading()});
+      const user = JSON.parse(localStorage.getItem('flowWmsUser')) || {nome:'Separador'};
+
+      const {error} = await client.from('wms_paletes').update({
+        status_expedicao: 'STAGED', endereco: vStage, picking_por: user.nome
+      }).eq('id', tarefaAtual.id);
+
+      if(error) return Swal.fire('Erro', error.message, 'error');
+
+      const Toast = Swal.mixin({ toast: true, position: "top-end", showConfirmButton: false, timer: 1500 });
+      Toast.fire({ icon: "success", title: "Palete separado!" });
+      
+      tarefasFila.shift(); 
+      carregarProximaTarefa(); 
+    }
+  </script>
+</body>
+</html>

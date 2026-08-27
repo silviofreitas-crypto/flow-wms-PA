@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
+    .input-pda { width: 100%; background: #f8fafc; border: 2px solid #cbd5e1; font-weight: 900; font-size: 1.75rem; text-align: center; border-radius: 0.75rem; padding: 1rem; outline: none; transition: border 0.2s; color: #0f172a; text-transform: uppercase; }
+    .input-pda:focus { border-color: #3b82f6; background: #fff; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
+  </style>
+</head>
+<body class="p-3 md:p-8 flex justify-center items-start min-h-screen">
+  
+  <div class="w-full max-w-md bg-white rounded-3xl shadow-lg border border-slate-200 overflow-hidden flex flex-col h-[90vh]">
+    <div class="bg-blue-600 p-4 text-white flex items-center gap-4 shrink-0 relative overflow-hidden">
+      <div class="absolute -right-4 -bottom-4 text-white opacity-10 text-6xl"><i class="fa-solid fa-truck-fast"></i></div>
+      <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center shrink-0 text-2xl relative z-10"><i class="fa-solid fa-truck-fast text-white"></i></div>
+      <div class="text-left relative z-10">
+        <h1 class="text-xl font-black tracking-tight leading-tight text-white">Loading (Doca)</h1>
+        <p class="text-blue-200 text-[10px] font-bold uppercase tracking-widest mt-0.5">Carregamento do Veículo</p>
+      </div>
+    </div>
+
+    <div class="p-5 flex-1 flex flex-col justify-between">
+      <div class="space-y-5">
+        <div>
+          <div class="flex justify-between items-end mb-1.5">
+            <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest">Carga Autorizada <span class="text-red-500">*</span></label>
+            <button onclick="carregarCargasLoading()" class="text-blue-600 hover:text-blue-700 text-[10px] font-black uppercase"><i class="fa-solid fa-rotate-right"></i> Atualizar</button>
+          </div>
+          <select id="selCarga" onchange="selecionarCarga()" class="w-full bg-slate-50 border-2 border-slate-200 text-slate-800 font-bold p-3 rounded-xl outline-none focus:border-blue-500 transition-colors cursor-pointer text-sm">
+            <option value="">Buscando cargas...</option>
+          </select>
+        </div>
+
+        <div id="cardInfoCarga" class="hidden bg-slate-50 border border-slate-200 p-4 rounded-2xl shadow-sm">
+          <div class="flex justify-between items-center mb-3 border-b border-slate-200 pb-2">
+            <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Placa do Veículo:</span>
+            <span class="text-xl font-black text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200" id="lblPlaca">ABC-1234</span>
+          </div>
+          <div class="space-y-1 mb-4">
+            <p class="text-xs font-bold text-slate-600 uppercase"><i class="fa-solid fa-user text-slate-400 mr-1"></i> Motorista: <span class="text-slate-800 font-black" id="lblMot">JOÃO</span></p>
+            <p class="text-xs font-bold text-slate-600 uppercase"><i class="fa-solid fa-location-dot text-slate-400 mr-1"></i> Destino: <span class="text-slate-800 font-black" id="lblDest">CD XPTO</span></p>
+          </div>
+
+          <!-- BARRA DE PROGRESSO -->
+          <div>
+            <div class="flex justify-between items-end mb-1">
+              <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Progresso do Embarque</span>
+              <span class="text-sm font-black text-blue-600" id="lblProgresso">0 / 34</span>
+            </div>
+            <div class="w-full bg-slate-200 rounded-full h-4 overflow-hidden border border-slate-300">
+              <div id="barraProgresso" class="bg-gradient-to-r from-blue-400 to-blue-600 h-4 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+          </div>
+        </div>
+
+        <div id="divBipar" class="hidden">
+          <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 text-center"><i class="fa-solid fa-barcode text-blue-500 mr-1"></i> Bipar LPN para Embarque <span class="text-red-500">*</span></label>
+          <input type="text" id="inpLpn" class="input-pda border-blue-300 text-blue-700 bg-blue-50" placeholder="LPN-XX-XX">
+        </div>
+      </div>
+
+      <button id="btnRegistrar" onclick="registrarEmbarque()" class="hidden w-full bg-blue-600 hover:bg-blue-700 text-white font-black text-lg py-4 rounded-xl shadow-lg shadow-blue-500/30 transition-transform active:scale-95 flex justify-center items-center gap-2 mt-4">
+        <i class="fa-solid fa-arrow-right-to-bracket"></i> EMBARCAR PALETE
+      </button>
+    </div>
+  </div>
+
+  <script>
+    const client = window.supabase.createClient('https://cbrwmscaidyeaamyfiyt.supabase.co', 'sb_publishable_neiGbVa2X1nBfX5wT3UGYw_3RWe43_G');
+    let cargasGlobais = [];
+    let cargaAtual = null;
+
+    window.onload = () => carregarCargasLoading();
+
+    async function carregarCargasLoading() {
+      const sel = document.getElementById('selCarga');
+      sel.innerHTML = '<option value="">Buscando...</option>';
+      document.getElementById('cardInfoCarga').classList.add('hidden');
+      document.getElementById('divBipar').classList.add('hidden');
+      document.getElementById('btnRegistrar').classList.add('hidden');
+
+      const {data: cargas, error} = await client.from('wms_cargas')
+                                        .select('*, wms_paletes(*)')
+                                        .in('status', ['AG_LOADING', 'LOADING'])
+                                        .order('id', {ascending: true});
+
+      if(error || !cargas || cargas.length === 0) {
+        sel.innerHTML = '<option value="">Nenhum caminhão liberado na doca</option>'; return;
+      }
+
+      cargasGlobais = cargas;
+      sel.innerHTML = '<option value="">-- SELECIONE O VEÍCULO --</option>';
+      cargasGlobais.forEach(c => {
+        let loaded = c.wms_paletes.filter(p => p.status_expedicao === 'LOADED').length;
+        let total = c.wms_paletes.length;
+        sel.innerHTML += `<option value="${c.id}">PLACA: ${c.placa} (${loaded}/${total} Carregados)</option>`;
+      });
+    }
+
+    function selecionarCarga() {
+      const cid = document.getElementById('selCarga').value;
+      if(!cid) {
+        document.getElementById('cardInfoCarga').classList.add('hidden');
+        document.getElementById('divBipar').classList.add('hidden');
+        document.getElementById('btnRegistrar').classList.add('hidden');
+        return;
+      }
+
+      cargaAtual = cargasGlobais.find(c => c.id == cid);
+      document.getElementById('lblPlaca').innerText = cargaAtual.placa;
+      document.getElementById('lblMot').innerText = cargaAtual.motorista || 'NÃO INFORMADO';
+      document.getElementById('lblDest').innerText = cargaAtual.destino || 'NÃO INFORMADO';
+
+      atualizarProgresso();
+
+      document.getElementById('cardInfoCarga').classList.remove('hidden');
+      document.getElementById('divBipar').classList.remove('hidden');
+      document.getElementById('btnRegistrar').classList.remove('hidden');
+      document.getElementById('btnRegistrar').classList.add('flex');
+      
+      document.getElementById('inpLpn').value = '';
+      document.getElementById('inpLpn').focus();
+    }
+
+    function atualizarProgresso() {
+      let loaded = cargaAtual.wms_paletes.filter(p => p.status_expedicao === 'LOADED').length;
+      let total = cargaAtual.wms_paletes.length;
+      let pct = (loaded / total) * 100;
+      
+      document.getElementById('lblProgresso').innerText = `${loaded} / ${total}`;
+      document.getElementById('barraProgresso').style.width = `${pct}%`;
+    }
+
+    async function registrarEmbarque() {
+      const vLpn = document.getElementById('inpLpn').value.trim().toUpperCase();
+      if(!vLpn) return Swal.fire('Atenção', 'Bipe a LPN para registrar o embarque.', 'warning');
+
+      Swal.fire({title: 'Analisando...', allowOutsideClick: false, didOpen:()=>Swal.showLoading()});
+
+      const pIndex = cargaAtual.wms_paletes.findIndex(p => p.lpn_expedicao === vLpn);
+      if(pIndex === -1) return Swal.fire('Erro LPN', `A LPN ${vLpn} não pertence a este veículo!`, 'error');
+      
+      let p = cargaAtual.wms_paletes[pIndex];
+      
+      if(p.status_expedicao === 'LOADED') return Swal.fire('Já Carregado', `Este palete já foi registrado no caminhão.`, 'info');
+      if(p.status_expedicao !== 'CONFERIDO') return Swal.fire('Fora de Fluxo', `O palete não passou na auditoria Cegas. Ele está como ${p.status_expedicao}.`, 'error');
+
+      const user = JSON.parse(localStorage.getItem('flowWmsUser')) || {nome:'Loader'};
+
+      await client.from('wms_paletes').update({
+        status_expedicao: 'LOADED', load_por: user.nome
+      }).eq('id', p.id);
+
+      // Atualiza o objeto local
+      cargaAtual.wms_paletes[pIndex].status_expedicao = 'LOADED';
+      atualizarProgresso();
+
+      // Muda o status da carga para LOADING se for o primeiro palete
+      if(cargaAtual.status === 'AG_LOADING') {
+        await client.from('wms_cargas').update({status: 'LOADING'}).eq('id', cargaAtual.id);
+        cargaAtual.status = 'LOADING';
+      }
+
+      // Verifica se finalizou 100%
+      let loaded = cargaAtual.wms_paletes.filter(x => x.status_expedicao === 'LOADED').length;
+      let total = cargaAtual.wms_paletes.length;
+
+      if(loaded === total) {
+        await client.from('wms_cargas').update({status: 'LOADED'}).eq('id', cargaAtual.id);
+        Swal.fire({title: '100% CARREGADO!', text: 'O veículo está completo e pronto para o SEC (Emissão de Romaneio).', icon: 'success', confirmButtonColor: '#2563eb'});
+        carregarCargasLoading();
+      } else {
+        const Toast = Swal.mixin({ toast: true, position: "top-end", showConfirmButton: false, timer: 1000 });
+        Toast.fire({ icon: "success", title: "Embarcado!" });
+        document.getElementById('inpLpn').value = '';
+        document.getElementById('inpLpn').focus();
+      }
+    }
+  </script>
+</body>
+</html>

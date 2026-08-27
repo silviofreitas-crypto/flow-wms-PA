@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
+    .input-pda { width: 100%; background: #f8fafc; border: 2px solid #cbd5e1; font-weight: 900; font-size: 1.5rem; text-align: center; border-radius: 0.75rem; padding: 0.75rem 1rem; outline: none; transition: border 0.2s; color: #0f172a; text-transform: uppercase; }
+    .input-pda:focus { border-color: #10b981; background: #fff; box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2); }
+    input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    .check-btn { transition: all 0.2s ease; cursor: pointer; user-select: none; }
+    .check-btn.checked { background-color: #ecfdf5 !important; border-color: #10b981 !important; color: #047857 !important; }
+    .check-btn.checked .icon-check { color: #10b981 !important; }
+  </style>
+</head>
+<body class="p-3 md:p-8 flex justify-center items-start min-h-screen">
+  
+  <div class="w-full max-w-md bg-white rounded-3xl shadow-lg border border-slate-200 overflow-hidden flex flex-col h-[90vh]">
+    <div class="bg-emerald-600 p-4 text-white flex items-center gap-4 shrink-0 relative overflow-hidden">
+      <div class="absolute -right-4 -bottom-4 text-white opacity-10 text-6xl"><i class="fa-solid fa-clipboard-check"></i></div>
+      <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center shrink-0 text-2xl relative z-10"><i class="fa-solid fa-clipboard-check text-white"></i></div>
+      <div class="text-left relative z-10">
+        <h1 class="text-xl font-black tracking-tight leading-tight text-white">Packing (Cegas)</h1>
+        <p class="text-emerald-200 text-[10px] font-bold uppercase tracking-widest mt-0.5">Auditoria de Stage</p>
+      </div>
+    </div>
+
+    <div class="p-5 flex-1 flex flex-col justify-between overflow-y-auto">
+      <div class="space-y-4">
+        
+        <!-- HEADER ONDA -->
+        <div>
+          <div class="flex justify-between items-end mb-1.5">
+            <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest">Carga (Onda) <span class="text-red-500">*</span></label>
+            <button onclick="carregarCargasStage(false)" class="text-emerald-600 hover:text-emerald-700 text-[10px] font-black uppercase"><i class="fa-solid fa-rotate-right"></i> Atualizar</button>
+          </div>
+          <!-- CORREÇÃO: onchange="limparTelaBusca(true)" para não resetar o próprio dropdown ao clicar -->
+          <select id="selCarga" onchange="limparTelaBusca(true)" class="w-full bg-slate-50 border-2 border-slate-200 text-slate-800 font-bold p-3 rounded-xl outline-none focus:border-emerald-500 transition-colors cursor-pointer text-sm mb-2 shadow-sm">
+            <option value="">Carregando...</option>
+          </select>
+        </div>
+
+        <!-- PASSO 1: BUSCAR LPN -->
+        <div id="passo1-lpn" class="bg-white border-2 border-emerald-100 p-5 rounded-3xl text-center shadow-sm transition-opacity">
+          <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-3"><i class="fa-solid fa-barcode text-emerald-500 mr-1"></i> Bipar LPN para Auditar <span class="text-red-500">*</span></label>
+          <input type="text" id="inpBuscaLpn" class="input-pda text-emerald-700 mb-4" placeholder="LPN-XX-XX">
+          <button onclick="buscarLpnParaAuditoria()" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-black text-sm py-4 rounded-xl shadow-lg transition-transform active:scale-95">
+            <i class="fa-solid fa-magnifying-glass mr-1"></i> BUSCAR PALETE
+          </button>
+        </div>
+
+        <!-- PASSO 2: AUDITORIA (VISUAL + CEGAS) -->
+        <div id="passo2-auditoria" class="hidden flex-col space-y-4">
+          
+          <div class="flex justify-between items-center bg-slate-50 p-2 rounded-lg border border-slate-200">
+            <button onclick="limparTelaBusca(true)" class="text-slate-500 font-black text-[10px] px-3 py-1.5 bg-white border border-slate-200 rounded-lg shadow-sm"><i class="fa-solid fa-arrow-left mr-1"></i> Voltar</button>
+            <span class="text-xs font-black text-emerald-700 bg-emerald-100 px-3 py-1 rounded" id="lblLpnDisplay">LPN-XX</span>
+          </div>
+
+          <div class="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl shadow-sm text-center relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-1 bg-emerald-500"></div>
+            <p class="font-black text-slate-800 text-[13px] leading-tight mb-2" id="audItem">CÓDIGO - DESCRIÇÃO</p>
+            <p class="text-[9px] font-bold text-emerald-700 uppercase tracking-widest bg-white border border-emerald-100 p-1.5 rounded inline-block" id="audCodigos">MOOVE: -- | PAX: --</p>
+          </div>
+          
+          <div class="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm space-y-4">
+            
+            <div>
+              <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">1. Validação Visual <span class="text-red-500">*</span></label>
+              <div id="btnCheckAud" onclick="toggleCheckAud()" class="check-btn bg-slate-50 border-2 border-slate-200 p-3 rounded-xl flex items-center justify-center shadow-sm gap-3">
+                <i class="fa-solid fa-boxes-stacked icon-check text-slate-300 text-2xl"></i>
+                <div class="text-left">
+                  <span class="text-[11px] font-black text-slate-600 uppercase block leading-tight">Produto Correto?</span>
+                  <span class="text-[9px] font-bold text-slate-400">Verifique os 3 códigos do palete.</span>
+                </div>
+              </div>
+              <input type="hidden" id="valCheckAud" value="0">
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">2. Conferência Física (Cegas) <span class="text-red-500">*</span></label>
+              <div class="relative">
+                <input type="number" id="inpQtdCegas" class="input-pda" placeholder="Qtd Real">
+                <span class="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-black text-slate-300">UN</span>
+              </div>
+            </div>
+
+          </div>
+
+          <button onclick="confirmarAuditoria()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black text-lg py-5 rounded-2xl shadow-xl shadow-emerald-500/30 transition-transform active:scale-95 flex justify-center items-center gap-2 mt-2">
+            <i class="fa-solid fa-check"></i> APROVAR DOCA
+          </button>
+
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const client = window.supabase.createClient('https://cbrwmscaidyeaamyfiyt.supabase.co', 'sb_publishable_neiGbVa2X1nBfX5wT3UGYw_3RWe43_G');
+    let cargasGlobais = [];
+    let produtosGlobais = {};
+    let paleteAuditoriaAtual = null;
+
+    window.onload = () => carregarCargasStage(false);
+
+    async function carregarCargasStage(manterSelecao = false) {
+      let selAtual = document.getElementById('selCarga').value;
+      const sel = document.getElementById('selCarga');
+      
+      const {data: prods} = await client.from('produtos_moove').select('*');
+      if(prods) prods.forEach(p => produtosGlobais[p.n_item] = p);
+
+      const {data: cargas, error} = await client.from('wms_cargas')
+                                        .select('id, destino, status, wms_paletes(id, status_expedicao)')
+                                        .in('status', ['SEPARACAO', 'CONFERENCIA', 'AG_LOADING'])
+                                        .order('id', {ascending: true});
+
+      if(error || !cargas || cargas.length === 0) {
+        sel.innerHTML = '<option value="">Nenhuma carga aguardando Packing</option>'; return;
+      }
+
+      cargasGlobais = cargas.filter(c => c.wms_paletes.some(p => p.status_expedicao === 'STAGED'));
+
+      if(cargasGlobais.length === 0) {
+        sel.innerHTML = '<option value="">Todos paletes já conferidos</option>'; 
+        return;
+      }
+
+      sel.innerHTML = '<option value="">-- SELECIONE A ONDA --</option>';
+      let selecionouAntigo = false;
+
+      cargasGlobais.forEach(c => {
+        let pendentes = c.wms_paletes.filter(p => p.status_expedicao === 'STAGED').length;
+        let selected = (manterSelecao && c.id == selAtual) ? 'selected' : '';
+        if(selected) selecionouAntigo = true;
+        sel.innerHTML += `<option value="${c.id}" ${selected}>PICK #${c.id} - ${c.destino} (${pendentes} Aguardando)</option>`;
+      });
+
+      // Se não encontrou o selecionado (ex: finalizou a onda), volta pro default e limpa
+      if(manterSelecao && !selecionouAntigo) {
+        limparTelaBusca(false);
+      }
+    }
+
+    // A mágica para manter a onda selecionada na tela: Recebe o parâmetro 'manterOnda'
+    function limparTelaBusca(manterOnda = true) {
+      document.getElementById('inpBuscaLpn').value = '';
+      document.getElementById('inpQtdCegas').value = '';
+      document.getElementById('valCheckAud').value = '0';
+      document.getElementById('btnCheckAud').classList.remove('checked');
+      
+      document.getElementById('passo1-lpn').classList.remove('hidden');
+      document.getElementById('passo2-auditoria').classList.add('hidden');
+      document.getElementById('passo2-auditoria').classList.remove('flex');
+      
+      paleteAuditoriaAtual = null;
+      
+      if(!manterOnda) {
+        document.getElementById('selCarga').value = '';
+      }
+      
+      setTimeout(() => document.getElementById('inpBuscaLpn').focus(), 100);
+    }
+
+    function toggleCheckAud() {
+      let valInput = document.getElementById('valCheckAud');
+      let btnDiv = document.getElementById('btnCheckAud');
+      if(valInput.value === '0') { valInput.value = '1'; btnDiv.classList.add('checked'); } 
+      else { valInput.value = '0'; btnDiv.classList.remove('checked'); }
+    }
+
+    async function buscarLpnParaAuditoria() {
+      const cid = document.getElementById('selCarga').value;
+      const vLpn = document.getElementById('inpBuscaLpn').value.trim().toUpperCase();
+
+      if(!cid) return Swal.fire('Atenção', 'Selecione a Carga no topo.', 'warning');
+      if(!vLpn) return Swal.fire('Atenção', 'Bipe a LPN.', 'warning');
+
+      Swal.fire({title: 'Buscando...', allowOutsideClick: false, didOpen:()=>Swal.showLoading()});
+
+      const {data: p, error} = await client.from('wms_paletes').select('*').eq('lpn_expedicao', vLpn).eq('carga_id', cid).single();
+
+      if(error || !p) {
+        return Swal.fire('Erro LPN', `A LPN ${vLpn} não foi encontrada nesta Carga.`, 'error');
+      }
+
+      if(p.status_expedicao !== 'STAGED') {
+        return Swal.fire('Fora de Fluxo', `Este palete está com status ${p.status_expedicao}. Ele precisa estar no STAGE aguardando conferência.`, 'warning');
+      }
+
+      paleteAuditoriaAtual = p;
+      let prodInfo = produtosGlobais[p.n_item] || { descricao: 'S/ DESC', cod_moove: 'N/A', cod_pax: 'N/A' };
+
+      document.getElementById('lblLpnDisplay').innerText = p.lpn_expedicao;
+      document.getElementById('audItem').innerText = `${p.n_item} - ${prodInfo.descricao}`;
+      document.getElementById('audCodigos').innerText = `MOOVE: ${prodInfo.cod_moove} | PAX: ${prodInfo.cod_pax}`;
+
+      Swal.close();
+      
+      document.getElementById('passo1-lpn').classList.add('hidden');
+      document.getElementById('passo2-auditoria').classList.remove('hidden');
+      document.getElementById('passo2-auditoria').classList.add('flex');
+      
+      setTimeout(() => document.getElementById('inpQtdCegas').focus(), 100);
+    }
+
+    async function confirmarAuditoria() {
+      let cItem = document.getElementById('valCheckAud').value;
+      let vQtd = document.getElementById('inpQtdCegas').value;
+
+      if(cItem === '0') return Swal.fire('Validação Pendente', 'Você precisa confirmar visualmente que o produto está correto.', 'warning');
+      if(!vQtd) return Swal.fire('Atenção', 'Digite a quantidade física do palete.', 'warning');
+
+      if(parseFloat(paleteAuditoriaAtual.qtd) !== parseFloat(vQtd)) return Swal.fire('Divergência: Quantidade', `A quantidade física digitada está incorreta.`, 'error');
+
+      Swal.fire({title: 'Aprovando...', allowOutsideClick: false, didOpen:()=>Swal.showLoading()});
+      const user = JSON.parse(localStorage.getItem('flowWmsUser')) || {nome:'Conferente OUT'};
+
+      await client.from('wms_paletes').update({
+        status_expedicao: 'CONFERIDO', conf_por: user.nome
+      }).eq('id', paleteAuditoriaAtual.id);
+
+      const Toast = Swal.mixin({ toast: true, position: "top", showConfirmButton: false, timer: 1500 });
+      Toast.fire({ icon: "success", title: "Match OK! Palete liberado." });
+      
+      // Atualiza a lista, mas mantém a onda selecionada na tela para ele bipar a próxima LPN rápido
+      carregarCargasStage(true); 
+      limparTelaBusca(true); 
+    }
+  </script>
+</body>
+</html>

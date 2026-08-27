@@ -19,6 +19,10 @@
     body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
     .input-login { width: 100%; background-color: #f1f5f9; border: 2px solid transparent; color: #1e293b; font-weight: 600; border-radius: 1rem; padding: 1rem 1.25rem; outline: none; }
     .input-login:focus { background-color: #ffffff; border-color: #0055A5; }
+    
+    /* Personaliza o Modal do SweetAlert2 */
+    .swal2-popup { border-radius: 1.5rem !important; }
+    .swal2-input { font-family: 'Inter', sans-serif !important; border-radius: 0.75rem !important; font-weight: 700 !important; }
   </style>
 
 </head>
@@ -99,9 +103,94 @@
         Swal.fire('Acesso Negado', 'Usuário ou senha incorretos.', 'error');
         btn.disabled = false; btn.innerHTML = `ENTRAR <i class="fa-solid fa-arrow-right"></i>`;
       } else {
-        localStorage.setItem('flowWmsUser', JSON.stringify(data));
-        window.location.href = 'painel.html'; 
+        // LÓGICA DE SENHA PADRÃO: Se for 1234, barra a entrada e pede troca obrigatória.
+        if (data.senha === '1234') {
+            btn.disabled = false; btn.innerHTML = `ENTRAR <i class="fa-solid fa-arrow-right"></i>`;
+            abrirModalTrocaSenha(data);
+        } else {
+            localStorage.setItem('flowWmsUser', JSON.stringify(data));
+            window.location.href = 'painel.html'; 
+        }
       }
+    }
+
+    async function abrirModalTrocaSenha(user) {
+        const { value: formValues } = await Swal.fire({
+            title: 'Troca de Senha Exigida',
+            html: `
+                <div class="text-left bg-slate-50 p-4 border border-slate-200 rounded-xl mb-4">
+                    <p class="text-sm font-bold text-slate-700">Olá, <span class="text-[#0055A5] font-black">${user.nome}</span>!</p>
+                    <p class="text-xs text-slate-500 mt-1">Como você está usando a senha padrão, precisamos que crie uma senha segura para proteger sua conta.</p>
+                </div>
+                <input id="swal-nova" type="password" class="swal2-input !mt-1 !mb-3" placeholder="Digite a nova senha">
+                <input id="swal-confirma" type="password" class="swal2-input !mt-0 !mb-2" placeholder="Repita a nova senha">
+                <div class="text-left pl-1">
+                    <p class="text-[10px] font-bold text-slate-400 mt-2 uppercase tracking-widest"><i class="fa-solid fa-check text-emerald-500 mr-1"></i> Mínimo de 6 dígitos</p>
+                    <p class="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest"><i class="fa-solid fa-check text-emerald-500 mr-1"></i> Apenas letras e/ou números</p>
+                    <p class="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest"><i class="fa-solid fa-xmark text-red-500 mr-1"></i> Não use espaços ou @, !, #, -</p>
+                </div>
+            `,
+            focusConfirm: false,
+            allowOutsideClick: false,
+            showCancelButton: true,
+            cancelButtonText: 'Cancelar Login',
+            confirmButtonText: 'Salvar Nova Senha',
+            confirmButtonColor: '#0055A5',
+            preConfirm: () => {
+                const pass1 = document.getElementById('swal-nova').value;
+                const pass2 = document.getElementById('swal-confirma').value;
+                
+                if (!pass1 || !pass2) {
+                    Swal.showValidationMessage('Preencha os dois campos.');
+                    return false;
+                }
+                if (pass1 !== pass2) {
+                    Swal.showValidationMessage('As senhas não coincidem.');
+                    return false;
+                }
+                if (pass1 === '1234') {
+                    Swal.showValidationMessage('A nova senha não pode ser 1234.');
+                    return false;
+                }
+                if (pass1.length < 6) {
+                    Swal.showValidationMessage('A senha precisa ter pelo menos 6 dígitos.');
+                    return false;
+                }
+                // Expressão Regular: Exige que só existam letras e números
+                const regexAlfanumerico = /^[a-zA-Z0-9]+$/;
+                if (!regexAlfanumerico.test(pass1)) {
+                    Swal.showValidationMessage('Caracteres inválidos! Use APENAS letras e números.');
+                    return false;
+                }
+                
+                return pass1;
+            }
+        });
+
+        if (formValues) {
+            Swal.fire({ title: 'Salvando nova senha...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+            
+            // Atualiza a senha no banco
+            const { error } = await client.from('usuarios').update({ senha: formValues }).eq('id', user.id);
+            
+            if (error) {
+                Swal.fire('Erro', 'Não foi possível alterar a senha. Tente novamente.', 'error');
+            } else {
+                // Atualiza o objeto do usuário logado localmente e libera o acesso
+                user.senha = formValues;
+                localStorage.setItem('flowWmsUser', JSON.stringify(user));
+                
+                Swal.fire({
+                    title: 'Senha Alterada!',
+                    text: 'Seu acesso está seguro. Entrando no sistema...',
+                    icon: 'success',
+                    timer: 1500,
+                    showConfirmButton: false
+                }).then(() => {
+                    window.location.href = 'painel.html';
+                });
+            }
+        }
     }
   </script>
 </body>

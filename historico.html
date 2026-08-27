@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>FLOW WMS | Histórico de Movimentações</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    body { background-color: #f8fafc; font-family: 'Inter', sans-serif; }
+    
+    .fade-in { animation: fadeIn 0.4s ease-out forwards; }
+    @keyframes fadeIn { 
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Nova Tabela Modern SaaS */
+    .tb-modern { width: 100%; border-collapse: separate; border-spacing: 0 0.5rem; }
+    .tb-modern th { padding: 0 1rem 0.5rem 1rem; font-size: 0.65rem; font-weight: 900; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; border: none; text-align: left; }
+    .tb-modern td { padding: 1rem; background: #ffffff; color: #334155; border-top: 1px solid #f8fafc; border-bottom: 1px solid #f8fafc; vertical-align: middle; }
+    .tb-modern td:first-child { border-left: 1px solid #f8fafc; border-top-left-radius: 1rem; border-bottom-left-radius: 1rem; }
+    .tb-modern td:last-child { border-right: 1px solid #f8fafc; border-top-right-radius: 1rem; border-bottom-right-radius: 1rem; }
+    .tb-modern tr { box-shadow: 0 2px 4px rgba(0,0,0,0.02); transition: all 0.2s ease; }
+    .tb-modern tr:hover { transform: translateY(-2px); box-shadow: 0 8px 15px -3px rgba(0,0,0,0.05); }
+
+    /* Scroll */
+    .table-container { overflow-x: auto; overflow-y: auto; max-height: 550px; border-radius: 1rem; margin-top: 1rem; padding: 0.5rem; }
+    .table-container::-webkit-scrollbar { width: 8px; height: 8px; }
+    .table-container::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 8px; }
+    .table-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+    
+    /* Inputs */
+    .input-icon-wrap { position: relative; width: 100%; }
+    .input-icon-wrap i { position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #94a3b8; }
+    .input-icon-wrap input { width: 100%; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.75rem; padding: 0.75rem 1rem 0.75rem 2.5rem; font-size: 0.75rem; font-weight: 700; color: #334155; outline: none; transition: all 0.2s; }
+    .input-icon-wrap input:focus { border-color: #10b981; box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1); background: #ffffff; }
+    
+    .label-float { font-size: 0.6rem; font-weight: 900; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.35rem; display: block; }
+  </style>
+
+</head>
+
+<body class="text-slate-800 antialiased flex flex-col min-h-screen">
+
+  <main class="flex-grow p-6 w-full fade-in max-w-[1600px] mx-auto">
+    
+    <div class="flex justify-between items-center mb-6 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+      <div class="flex items-center gap-4">
+        <div class="bg-emerald-50 text-emerald-600 w-12 h-12 rounded-xl flex items-center justify-center text-xl border border-emerald-100">
+          <i class="fa-solid fa-clock-rotate-left"></i>
+        </div>
+        <div>
+          <h2 class="text-2xl font-black text-slate-800 tracking-tight leading-none">Auditoria & Histórico</h2>
+          <p class="text-slate-500 text-xs font-bold mt-1">Rastreabilidade linha a linha de movimentações do WMS.</p>
+        </div>
+      </div>
+      <button id="btn-exportar" onclick="exportarParaXLSX()" class="bg-slate-800 hover:bg-slate-900 text-white px-5 py-3 rounded-xl font-black transition-all text-xs flex items-center gap-2 shadow-sm active:scale-95">
+        <i class="fa-solid fa-file-excel text-emerald-400"></i> Exportar (XLSX)
+      </button>
+    </div>
+
+    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mb-6 flex flex-wrap gap-4 items-end">
+      
+      <div class="flex-1 min-w-[140px]">
+        <label class="label-float">Data Inicial</label>
+        <div class="input-icon-wrap">
+          <i class="fa-solid fa-calendar-day"></i>
+          <input type="date" id="fDataIni">
+        </div>
+      </div>
+      
+      <div class="flex-1 min-w-[140px]">
+        <label class="label-float">Data Final</label>
+        <div class="input-icon-wrap">
+          <i class="fa-solid fa-calendar-week"></i>
+          <input type="date" id="fDataFim">
+        </div>
+      </div>
+
+      <div class="flex-1 min-w-[160px]">
+        <label class="label-float">Produto (Cód.)</label>
+        <div class="input-icon-wrap">
+          <i class="fa-solid fa-box"></i>
+          <input type="text" id="fProduto" class="uppercase" placeholder="Ex: E-PA...">
+        </div>
+      </div>
+
+      <div class="flex-1 min-w-[180px]">
+        <label class="label-float">Codinome (LPN / SSCC)</label>
+        <div class="input-icon-wrap">
+          <i class="fa-solid fa-barcode"></i>
+          <input type="text" id="fCodinome" class="uppercase" placeholder="LPN-XX-XX">
+        </div>
+      </div>
+
+      <div class="flex-1 min-w-[130px]">
+        <label class="label-float">Lote Físico</label>
+        <div class="input-icon-wrap">
+          <i class="fa-solid fa-tag"></i>
+          <input type="text" id="fLote" class="uppercase" placeholder="Ex: 2212">
+        </div>
+      </div>
+
+      <div class="w-full sm:w-auto mt-2">
+        <button id="btn-consultar" onclick="buscarHistorico()" class="bg-emerald-500 hover:bg-emerald-600 text-white w-full sm:w-auto px-6 py-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95 h-[42px]">
+          <i class="fa-solid fa-filter"></i> Aplicar Filtros
+        </button>
+      </div>
+
+    </div>
+
+    <div id="results-container">
+      <div class="text-center py-16 bg-white rounded-2xl border border-slate-200 mt-6 shadow-sm">
+        <div class="w-20 h-20 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center text-4xl mx-auto mb-4 border border-slate-100"><i class="fa-solid fa-magnifying-glass"></i></div>
+        <h3 class="text-lg font-black text-slate-700 mb-1">Pronto para buscar</h3>
+        <p class="text-slate-500 font-bold text-sm">Preencha os filtros acima para auditar o WMS.</p>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    const client = window.supabase.createClient('https://cbrwmscaidyeaamyfiyt.supabase.co', 'sb_publishable_neiGbVa2X1nBfX5wT3UGYw_3RWe43_G');
+    let dadosConsultados = []; 
+    let produtosGlobais = {};
+
+    window.onload = async () => {
+      const {data: prods} = await client.from('produtos_moove').select('n_item, descricao, cliente');
+      if(prods) prods.forEach(p => produtosGlobais[p.n_item] = p);
+    };
+
+    function showToast(message, type = 'success') {
+      Swal.fire({ toast: true, position: 'top-end', icon: type, title: message, showConfirmButton: false, timer: 3000 });
+    }
+
+    async function buscarHistorico() {
+      const btn = document.getElementById("btn-consultar");
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Buscando...`;
+
+      const fProd = document.getElementById("fProduto").value.trim().toUpperCase();
+      const fCod = document.getElementById("fCodinome").value.trim().toUpperCase();
+      const fLote = document.getElementById("fLote").value.trim().toUpperCase();
+      const dtIni = document.getElementById("fDataIni").value;
+      const dtFim = document.getElementById("fDataFim").value;
+
+      let query = client.from('wms_paletes').select('*').order('id', {ascending: false});
+
+      if(fProd) query = query.ilike('n_item', `%${fProd}%`);
+      if(fLote) query = query.ilike('lote', `%${fLote}%`);
+      if(fCod)  query = query.or(`codigo_palete.ilike.%${fCod}%,lpn_expedicao.ilike.%${fCod}%`);
+      if(dtIni) query = query.gte('updated_at', `${dtIni}T00:00:00.000Z`); // Usa o gatilho novo
+      if(dtFim) query = query.lte('updated_at', `${dtFim}T23:59:59.999Z`); // Usa o gatilho novo
+      
+      query = query.limit(500);
+
+      const { data, error } = await query;
+
+      if(error) {
+        Swal.fire("Erro", "Falha ao buscar histórico: " + error.message, "error");
+      } else {
+        processarDadosParaTabela(data || []);
+      }
+
+      btn.disabled = false;
+      btn.innerHTML = `<i class="fa-solid fa-filter"></i> Aplicar Filtros`;
+    }
+
+    function processarDadosParaTabela(paletes) {
+      dadosConsultados = [];
+      const container = document.getElementById("results-container");
+
+      if (paletes.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-16 bg-white rounded-2xl border border-slate-200 mt-6 shadow-sm">
+            <div class="w-20 h-20 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center text-4xl mx-auto mb-4 border border-slate-100"><i class="fa-solid fa-ghost"></i></div>
+            <h3 class="text-lg font-black text-slate-700 mb-1">Nenhum rastro encontrado</h3>
+            <p class="text-slate-500 font-bold text-sm">Não há movimentações para os filtros informados.</p>
+          </div>`;
+        return;
+      }
+
+      let tabela = `
+        <div class="table-container fade-in">
+          <table class="tb-modern">
+            <thead>
+              <tr>
+                <th>Data / Hora</th>
+                <th>Status FUP</th>
+                <th>Identificação WMS</th>
+                <th>Produto & Descrição</th>
+                <th>Lote Físico</th>
+                <th>Local Atual</th>
+                <th>Operador Responsável</th>
+                <th class="text-right">Qtd</th>
+              </tr>
+            </thead>
+            <tbody>`;
+
+      paletes.forEach(item => {
+        let prodInfo = produtosGlobais[item.n_item] || { descricao: 'S/ DESC', cliente: 'S/ CLIENTE' };
+        
+        let statusReal = item.status_expedicao || item.status;
+        let ultimoUsuario = item.load_por || item.conf_por || item.picking_por || item.armazenado_por || item.recebido_por || 'S/N';
+        
+        let dtBase = item.updated_at || item.armazenado_em || item.recebido_em;
+        let dObj = dtBase ? new Date(dtBase) : null;
+        let htmlData = dObj ? `<div class="font-black text-slate-700 text-xs"><i class="fa-regular fa-calendar text-slate-400 mr-1"></i> ${dObj.toLocaleDateString('pt-BR')}</div><div class="text-[10px] font-bold text-slate-500 mt-0.5">${dObj.toLocaleTimeString('pt-BR')}</div>` : '-';
+        
+        let displayLpn = item.lpn_expedicao ? `<div class="font-black text-blue-600 text-sm mb-1">${item.lpn_expedicao}</div><div class="text-[9px] font-bold text-slate-400 uppercase tracking-widest bg-slate-100 px-2 py-0.5 rounded w-fit border border-slate-200">PLT: ${item.codigo_palete}</div>` : `<div class="font-black text-slate-700 text-xs">${item.codigo_palete}</div>`;
+
+        let bgCor, txtCor, icone, txtStatus;
+        
+        if(statusReal === 'TRANSICAO') { txtStatus = 'PUXADA'; bgCor = 'bg-amber-50'; txtCor = 'text-amber-600'; icone = 'fa-dolly'; }
+        else if(statusReal === 'ARMAZENADO') { txtStatus = 'ARMAZENAGEM'; bgCor = 'bg-indigo-50'; txtCor = 'text-indigo-600'; icone = 'fa-cubes-stacked'; }
+        else if(statusReal === 'PENDENTE_PICKING') { txtStatus = 'ROTEIRIZADO'; bgCor = 'bg-slate-100'; txtCor = 'text-slate-600'; icone = 'fa-route'; }
+        else if(statusReal === 'STAGED') { txtStatus = 'PICKING'; bgCor = 'bg-orange-50'; txtCor = 'text-orange-600'; icone = 'fa-box-open'; }
+        else if(statusReal === 'CONFERIDO') { txtStatus = 'CONFERIDO'; bgCor = 'bg-blue-50'; txtCor = 'text-blue-600'; icone = 'fa-clipboard-check'; }
+        else if(statusReal === 'LOADED') { txtStatus = 'LOADING'; bgCor = 'bg-purple-50'; txtCor = 'text-purple-600'; icone = 'fa-truck-ramp-box'; }
+        else if(statusReal === 'EXPEDIDO') { txtStatus = 'EXPEDIDO'; bgCor = 'bg-emerald-50'; txtCor = 'text-emerald-600'; icone = 'fa-check-double'; }
+        else { txtStatus = statusReal; bgCor = 'bg-gray-50'; txtCor = 'text-gray-600'; icone = 'fa-circle-dot'; }
+
+        let htmlBadge = `<div class="${bgCor} ${txtCor} px-3 py-1.5 rounded-lg font-black text-[10px] uppercase flex items-center justify-center gap-1.5 w-fit border border-current/20 shadow-sm"><i class="fa-solid ${icone}"></i> ${txtStatus}</div>`;
+
+        dadosConsultados.push({
+          "Data/Hora": dObj ? dObj.toLocaleString('pt-BR') : '-',
+          "Operação WMS": txtStatus,
+          "Item": item.n_item,
+          "SSCC / LPN": item.lpn_expedicao || item.codigo_palete,
+          "Descrição": prodInfo.descricao,
+          "Cliente": prodInfo.cliente,
+          "Lote": item.lote,
+          "Endereço": item.endereco,
+          "Responsável": ultimoUsuario,
+          "Qtd (UN)": item.qtd
+        });
+
+        tabela += `
+          <tr>
+            <td class="whitespace-nowrap">${htmlData}</td>
+            <td>${htmlBadge}</td>
+            <td class="leading-tight">${displayLpn}</td>
+            <td>
+              <div class="font-black text-slate-800 text-xs mb-0.5">${item.n_item}</div>
+              <div class="text-[10px] font-bold text-slate-500 max-w-[200px] truncate" title="${prodInfo.descricao}">${prodInfo.descricao}</div>
+              <div class="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">CLI: ${prodInfo.cliente}</div>
+            </td>
+            <td><div class="font-mono text-xs font-black text-slate-700 bg-slate-50 px-2 py-1 rounded border border-slate-100 w-fit">${item.lote || '-'}</div></td>
+            <td><div class="text-xs font-bold text-slate-600"><i class="fa-solid fa-location-dot text-red-500 mr-1"></i> ${item.endereco}</div></td>
+            <td><div class="bg-indigo-50 text-indigo-700 font-black px-2 py-1 rounded border border-indigo-100 text-[9px] uppercase tracking-wider w-fit"><i class="fa-solid fa-user-astronaut mr-1 text-indigo-400"></i> ${ultimoUsuario}</div></td>
+            <td class="text-right font-black text-slate-800 text-base">${item.qtd}</td>
+          </tr>`;
+      });
+
+      tabela += `</tbody></table></div>`;
+      container.innerHTML = tabela;
+    }
+
+    function exportarParaXLSX() {
+      if (dadosConsultados.length === 0) {
+        return showToast("Faça uma consulta para exportar.", "warning");
+      }
+
+      const btn = document.getElementById("btn-exportar");
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Gerando...`;
+      btn.disabled = true;
+
+      setTimeout(() => {
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.json_to_sheet(dadosConsultados);
+        
+        ws['!cols'] = [{wch:18}, {wch:18}, {wch:15}, {wch:22}, {wch:45}, {wch:15}, {wch:15}, {wch:15}, {wch:25}, {wch:10}];
+        
+        XLSX.utils.book_append_sheet(wb, ws, "Auditoria");
+        const nomeArquivo = `Auditoria_WMS_${new Date().toISOString().slice(0,10)}.xlsx`;
+        XLSX.writeFile(wb, nomeArquivo);
+
+        btn.innerHTML = `<i class="fa-solid fa-file-excel text-emerald-400"></i> Exportar (XLSX)`;
+        btn.disabled = false;
+        showToast("Relatório Baixado!", "success");
+      }, 100);
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Gestão de Separações e Embarque (SEC)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #f8fafc; padding: 1rem; margin: 0; }
+    .card-desktop { background: white; border-radius: 0.5rem; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+    .prog-bg { width: 100%; background-color: #e2e8f0; border-radius: 9999px; height: 6px; overflow: hidden; margin-top: 4px; }
+    .prog-bar { height: 100%; border-radius: 9999px; transition: width 0.5s ease; }
+    .prog-pick { background-color: #f59e0b; }
+    .prog-pack { background-color: #10b981; }
+    .prog-load { background-color: #3b82f6; }
+    .swal-desktop-modal { border-radius: 0.5rem !important; }
+    .swal-wide-modal { width: 900px !important; border-radius: 0.5rem !important; padding: 1.5rem !important;}
+    .tb-compact th { padding: 0.75rem 1rem; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em; color: #475569; background: #f1f5f9; border-bottom: 2px solid #e2e8f0; }
+    .tb-compact td { padding: 0.75rem 1rem; font-size: 0.75rem; color: #334155; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+    .tb-compact tr:hover { background-color: #f8fafc; }
+
+    @media print {
+      @page { size: A4 portrait; margin: 0; }
+      body { background: white !important; padding: 0 !important; margin: 0 !important; }
+      body * { visibility: hidden; }
+      #areaRomaneio, #areaRomaneio * { visibility: visible; }
+      #areaRomaneio { position: absolute; left: 0; top: 0; width: 100%; display: block !important; font-family: 'Inter', sans-serif; padding: 15mm; box-sizing: border-box; }
+      .no-print { display: none !important; }
+      
+      .rom-header { border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: flex-end; }
+      .rom-title { font-size: 18px; font-weight: 900; margin: 0; color: #0f172a; text-transform: uppercase; }
+      .rom-meta { font-size: 10px; font-weight: bold; color: #475569; margin: 2px 0 0 0; text-transform: uppercase; }
+      .rom-pick { font-size: 20px; font-weight: 900; margin: 0; color: #0f172a; }
+      
+      .rom-info-box { display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 12px; border: 1px solid #cbd5e1; padding: 8px 12px; border-radius: 6px; }
+      .rom-info-col { width: 48%; }
+      .rom-info-col p { margin: 2px 0; color: #334155; }
+      .rom-info-col b { color: #0f172a; }
+
+      .romaneio-tb { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 8.5px; }
+      .romaneio-tb th, .romaneio-tb td { border: 1px solid #cbd5e1; padding: 4px; text-align: center; }
+      .romaneio-tb th { background-color: #f1f5f9 !important; -webkit-print-color-adjust: exact; font-weight: 900; color: #475569; text-transform: uppercase; }
+      .romaneio-tb td { color: #0f172a; font-weight: 600; }
+      
+      .rom-assinaturas { display: flex; justify-content: space-between; margin-top: 40px; }
+      .rom-ass-box { width: 45%; text-align: center; font-size: 10px; }
+      .rom-linha { border-top: 1px solid #0f172a; padding-top: 4px; font-weight: 900; color: #0f172a; margin-bottom: 3px; }
+      .rom-ass-meta { color: #475569; font-weight: 600; }
+    }
+  </style>
+</head>
+<body class="text-slate-800">
+
+  <div class="max-w-[1500px] mx-auto flex flex-col h-[92vh] no-print gap-4">
+    
+    <div class="flex justify-between items-center bg-white rounded-lg border border-slate-200 shadow-sm p-4 shrink-0 border-l-4 border-l-indigo-600">
+      <div class="flex items-center gap-3">
+        <div class="bg-indigo-50 text-indigo-600 w-10 h-10 rounded text-lg flex items-center justify-center border border-indigo-100"><i class="fa-solid fa-list-check"></i></div>
+        <div>
+          <h1 class="text-lg font-black text-slate-800 tracking-tight leading-none">Gestão de Separações (SEC)</h1>
+          <p class="text-slate-500 font-medium text-[11px] mt-1">Acompanhamento FUP, Lançamento de NF e Emissão de Romaneio</p>
+        </div>
+      </div>
+      
+      <div class="flex items-center gap-3">
+        <div class="relative">
+          <i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+          <input type="text" id="inpBuscaCarga" onkeyup="filtrarCargas()" class="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded shadow-inner text-xs font-bold w-64 outline-none focus:border-indigo-500 transition-colors uppercase" placeholder="Buscar PICK # ou Placa...">
+        </div>
+
+        <div class="flex items-center gap-2 bg-slate-50 px-3 py-1.5 border border-slate-200 rounded shadow-inner" title="Filtro aplica apenas para cargas já EXPEDIDAS.">
+          <i class="fa-solid fa-calendar-day text-indigo-500 text-sm"></i>
+          <div class="flex flex-col">
+            <span class="text-[9px] font-black text-slate-400 uppercase leading-none">Histórico SEC</span>
+            <input type="date" id="dataSec" class="text-xs font-bold text-slate-700 bg-transparent border-none outline-none cursor-pointer p-0 m-0 leading-none" onchange="carregarProgressoCargas()">
+          </div>
+        </div>
+        <button onclick="carregarProgressoCargas()" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded font-bold text-xs transition-colors shadow-sm flex items-center gap-2"><i class="fa-solid fa-rotate-right"></i> Atualizar</button>
+      </div>
+    </div>
+
+    <div class="flex-1 overflow-hidden card-desktop flex flex-col bg-white">
+      <div class="flex-1 overflow-y-auto custom-scrollbar">
+        <table class="w-full text-left tb-compact">
+          <thead class="sticky top-0 z-10">
+            <tr>
+              <th class="w-[8%]">Ordem</th>
+              <th class="w-[18%]">Destino / Cliente</th>
+              <th class="w-[12%]">Picking</th>
+              <th class="w-[12%]">Packing</th>
+              <th class="w-[12%]">Loading</th>
+              <th class="w-[12%] text-center">Nota Fiscal</th>
+              <th class="w-[26%] text-center">Status FUP (Clique p/ Ações)</th>
+            </tr>
+          </thead>
+          <tbody id="tbSec">
+            <tr><td colspan="7" class="text-center py-10 font-bold text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Atualizando Radar...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="areaRomaneio" class="hidden"></div>
+
+  <script>
+    const client = window.supabase.createClient('https://cbrwmscaidyeaamyfiyt.supabase.co', 'sb_publishable_neiGbVa2X1nBfX5wT3UGYw_3RWe43_G');
+    let cargasGlobais = [];
+    let produtosGlobais = {};
+
+    window.onload = () => {
+      const hoje = new Date();
+      document.getElementById('dataSec').value = hoje.toISOString().split('T')[0];
+      carregarProgressoCargas();
+    };
+
+    function gerarBadgeStatus(statusWms, pctPick, pctPack, pctLoad, nf) {
+      const base = "px-2 py-1.5 rounded font-black text-[9px] uppercase border shadow-sm w-full block text-center tracking-widest";
+      if (statusWms === 'EXPEDIDA') return `<span class="${base} bg-emerald-100 text-emerald-700 border-emerald-300"><i class="fa-solid fa-check-double mr-1"></i> Expedido</span>`;
+      if (pctLoad === 100 && nf) return `<span class="${base} bg-teal-100 text-teal-700 border-teal-300"><i class="fa-solid fa-file-signature mr-1"></i> Ag. Emissão SEC</span>`;
+      if (pctLoad === 100 && !nf) return `<span class="${base} bg-blue-100 text-blue-700 border-blue-300"><i class="fa-solid fa-file-invoice mr-1"></i> Ag. Nota Fiscal</span>`;
+      if (pctLoad > 0) return `<span class="${base} bg-yellow-100 text-yellow-700 border-yellow-300"><i class="fa-solid fa-truck-fast mr-1"></i> Em Carregamento</span>`;
+      if (statusWms === 'AG_LOADING') return `<span class="${base} bg-yellow-100 text-yellow-700 border-yellow-300"><i class="fa-solid fa-pause mr-1"></i> Ag. Carregamento</span>`;
+      if (pctPack === 100) return `<span class="${base} bg-yellow-100 text-yellow-700 border-yellow-300"><i class="fa-solid fa-unlock-keyhole mr-1"></i> Ag. Liberação Doca</span>`;
+      if (pctPack > 0) return `<span class="${base} bg-yellow-100 text-yellow-700 border-yellow-300"><i class="fa-solid fa-clipboard-check mr-1"></i> Em Conferência</span>`;
+      if (pctPick === 100) return `<span class="${base} bg-yellow-100 text-yellow-700 border-yellow-300"><i class="fa-solid fa-clipboard-list mr-1"></i> Ag. Auditoria</span>`;
+      if (pctPick > 0) return `<span class="${base} bg-yellow-100 text-yellow-700 border-yellow-300"><i class="fa-solid fa-dolly mr-1"></i> Em Separação</span>`;
+      return `<span class="${base} bg-white text-slate-500 border-slate-200"><i class="fa-solid fa-clock mr-1"></i> Ag. Separação</span>`;
+    }
+
+    function filtrarCargas() {
+      let termo = document.getElementById('inpBuscaCarga').value.toLowerCase();
+      let trs = document.querySelectorAll('.linha-carga');
+      trs.forEach(tr => {
+        let texto = tr.innerText.toLowerCase();
+        tr.style.display = texto.includes(termo) ? '' : 'none';
+      });
+    }
+
+    async function carregarProgressoCargas() {
+      const tb = document.getElementById('tbSec');
+      tb.innerHTML = '<tr><td colspan="7" class="text-center py-10 font-bold text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Atualizando Radar...</td></tr>';
+      
+      let dataFiltro = document.getElementById('dataSec').value;
+
+      const {data: prods} = await client.from('produtos_moove').select('*');
+      if(prods) prods.forEach(p => produtosGlobais[p.n_item] = p);
+
+      const { data: ativas } = await client.from('wms_cargas').select('*, wms_paletes(*)').neq('status', 'EXPEDIDA');
+      const { data: expedidas } = await client.from('wms_cargas').select('*, wms_paletes(*)').eq('status', 'EXPEDIDA').gte('expedido_em', `${dataFiltro}T00:00:00.000Z`).lte('expedido_em', `${dataFiltro}T23:59:59.999Z`);
+
+      let cargas = [...(ativas || []), ...(expedidas || [])];
+      cargas.sort((a, b) => b.id - a.id); 
+
+      if(cargas.length === 0) {
+        return tb.innerHTML = '<tr><td colspan="7" class="text-center py-16 font-bold text-slate-400 border-2 border-dashed border-slate-200 rounded-lg m-4 block">Nenhum processo no radar.</td></tr>';
+      }
+
+      cargasGlobais = cargas;
+      let html = '';
+
+      cargas.forEach(c => {
+        let total = c.wms_paletes.length;
+        if(total === 0) return;
+
+        let pickCount = c.wms_paletes.filter(p => ['STAGED', 'CONFERIDO', 'LOADED', 'EXPEDIDO'].includes(p.status_expedicao)).length;
+        let packCount = c.wms_paletes.filter(p => ['CONFERIDO', 'LOADED', 'EXPEDIDO'].includes(p.status_expedicao)).length;
+        let loadCount = c.wms_paletes.filter(p => ['LOADED', 'EXPEDIDO'].includes(p.status_expedicao)).length;
+
+        let pctPick = (pickCount / total) * 100;
+        let pctPack = (packCount / total) * 100;
+        let pctLoad = (loadCount / total) * 100;
+
+        let fupBadge = gerarBadgeStatus(c.status, pctPick, pctPack, pctLoad, c.nota_fiscal);
+        let opacityRow = c.status === 'EXPEDIDA' ? 'opacity-60 bg-slate-50/50' : '';
+        let txtNf = c.nota_fiscal ? `<span class="text-[11px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100"><i class="fa-solid fa-file-invoice text-emerald-400 mr-1"></i>${c.nota_fiscal}</span>` : `<span class="text-slate-300">-</span>`;
+
+        html += `
+          <tr class="linha-carga hover:bg-indigo-50 transition-colors group cursor-pointer ${opacityRow}" onclick="abrirAcoesCarga(${c.id})">
+            <td class="font-black text-slate-800 text-sm align-middle">
+              PICK #${c.id}
+              <div class="text-[9px] text-slate-400 font-bold mt-1 uppercase">PLACA: ${c.placa.includes('FAK') ? '--' : c.placa}</div>
+            </td>
+            <td class="align-middle">
+              <span class="text-[11px] font-bold text-slate-700 block truncate max-w-[180px]" title="${c.destino}">${c.destino}</span>
+              <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1 block">CLI: ${c.cliente}</span>
+            </td>
+            <td class="align-middle"><div class="flex justify-between items-end mb-1"><span class="text-[9px] font-black text-slate-500">${pickCount}/${total}</span><span class="text-[9px] font-bold text-slate-400">${pctPick.toFixed(0)}%</span></div><div class="prog-bg"><div class="prog-bar prog-pick" style="width: ${pctPick}%"></div></div></td>
+            <td class="align-middle"><div class="flex justify-between items-end mb-1"><span class="text-[9px] font-black text-slate-500">${packCount}/${total}</span><span class="text-[9px] font-bold text-slate-400">${pctPack.toFixed(0)}%</span></div><div class="prog-bg"><div class="prog-bar prog-pack" style="width: ${pctPack}%"></div></div></td>
+            <td class="align-middle"><div class="flex justify-between items-end mb-1"><span class="text-[9px] font-black text-slate-500">${loadCount}/${total}</span><span class="text-[9px] font-bold text-slate-400">${pctLoad.toFixed(0)}%</span></div><div class="prog-bg"><div class="prog-bar prog-load" style="width: ${pctLoad}%"></div></div></td>
+            <td class="align-middle text-center">${txtNf}</td>
+            <td class="align-middle text-center pr-4">${fupBadge}</td>
+          </tr>`;
+      });
+      tb.innerHTML = html;
+    }
+
+    function abrirAcoesCarga(idCarga) {
+      let carga = cargasGlobais.find(c => c.id == idCarga);
+      
+      let total = carga.wms_paletes.length;
+      let packCount = carga.wms_paletes.filter(p => ['CONFERIDO', 'LOADED', 'EXPEDIDO'].includes(p.status_expedicao)).length;
+      let loadCount = carga.wms_paletes.filter(p => ['LOADED', 'EXPEDIDO'].includes(p.status_expedicao)).length;
+
+      let btnAcao = '';
+      if(carga.status === 'EXPEDIDA') {
+        btnAcao = `<button onclick='imprimirRomaneio(${JSON.stringify(carga)})' class="bg-slate-800 hover:bg-slate-900 text-white px-5 py-2 rounded font-black text-xs transition-colors shadow-sm"><i class="fa-solid fa-print mr-1"></i> Reimprimir SEC</button>`;
+      } else {
+        if(!carga.destino || carga.destino === 'A DEFINIR') {
+           btnAcao = `<button disabled class="bg-slate-100 text-slate-400 px-5 py-2 rounded font-black text-xs cursor-not-allowed border border-slate-200">Aguardando Transporte</button>`;
+        } else if(packCount === total && !['AG_LOADING', 'LOADING', 'LOADED'].includes(carga.status)) {
+          btnAcao = `<button onclick="autorizarLoading(${carga.id})" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded font-black text-xs transition-colors shadow-sm"><i class="fa-solid fa-key mr-1"></i> Autorizar Embarque (Doca)</button>`;
+        } else if (loadCount === total && !carga.nota_fiscal) {
+          btnAcao = `<button onclick='informarNf(${carga.id})' class="bg-blue-500 hover:bg-blue-600 text-white px-5 py-2 rounded font-black text-xs transition-colors shadow-sm"><i class="fa-solid fa-file-invoice mr-1"></i> Informar Nota Fiscal</button>`;
+        } else if (loadCount === total && carga.nota_fiscal) {
+          btnAcao = `<button onclick='emitirSec(${JSON.stringify(carga)})' class="bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2 rounded font-black text-xs transition-colors shadow-sm"><i class="fa-solid fa-file-signature mr-1"></i> Emitir SEC</button>`;
+        }
+      }
+
+      let btnCancelar = carga.status !== 'EXPEDIDA' 
+        ? `<button onclick="cancelarOperacaoCompleta(${carga.id})" class="bg-white border border-red-200 text-red-500 hover:bg-red-50 px-5 py-2 rounded font-black text-xs transition-colors shadow-sm"><i class="fa-solid fa-ban mr-1"></i> Cancelar Carga</button>` 
+        : '';
+
+      let linhasPaletes = '';
+      carga.wms_paletes.forEach(p => {
+        let corStatus = p.status_expedicao === 'PENDENTE_PICKING' ? 'bg-amber-100 text-amber-700' :
+                        p.status_expedicao === 'STAGED' ? 'bg-orange-100 text-orange-700' :
+                        p.status_expedicao === 'CONFERIDO' ? 'bg-blue-100 text-blue-700' :
+                        p.status_expedicao === 'LOADED' || p.status_expedicao === 'EXPEDIDO' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700';
+
+        linhasPaletes += `
+          <tr class="border-b border-slate-100 hover:bg-slate-50 text-left">
+            <td class="py-2 px-2 font-black text-slate-700 text-[11px]">${p.lpn_expedicao || '-'}</td>
+            <td class="py-2 px-2 font-bold text-slate-600 text-[11px]">${p.n_item}</td>
+            <td class="py-2 px-2 text-center text-[10px] font-bold text-slate-500">${p.lote}</td>
+            <td class="py-2 px-2 text-center text-[10px] font-black">${p.qtd}</td>
+            <td class="py-2 px-2 text-[9px] text-slate-500 uppercase">${p.picking_por || '-'}</td>
+            <td class="py-2 px-2 text-[9px] text-slate-500 uppercase">${p.conf_por || '-'}</td>
+            <td class="py-2 px-2 text-[9px] text-slate-500 uppercase">${p.load_por || '-'}</td>
+            <td class="py-2 px-2 text-center"><span class="px-2 py-0.5 rounded font-black text-[9px] uppercase tracking-wider ${corStatus}">${p.status_expedicao || 'Pendente'}</span></td>
+          </tr>
+        `;
+      });
+
+      Swal.fire({
+        title: `<div class="flex justify-between items-center w-full mb-2">
+                  <div class="text-left leading-none">
+                    <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Ações Operacionais e Auditoria</span>
+                    <span class="text-xl font-black text-slate-800">PICKING #${carga.id}</span>
+                  </div>
+                  <div class="flex gap-2">
+                    ${btnCancelar}
+                    ${btnAcao}
+                  </div>
+                </div>`,
+        html: `
+          <div class="mt-2">
+            <div class="flex justify-between bg-slate-50 p-3 rounded border border-slate-200 text-xs font-bold text-slate-600 mb-3 text-left">
+              <div><span class="text-[9px] text-slate-400 uppercase font-black tracking-widest block mb-0.5">Placa Oficial</span>${carga.placa.includes('FAK') ? '--' : carga.placa}</div>
+              <div><span class="text-[9px] text-slate-400 uppercase font-black tracking-widest block mb-0.5">Motorista</span>${carga.motorista || 'Pendente'}</div>
+              <div><span class="text-[9px] text-slate-400 uppercase font-black tracking-widest block mb-0.5">NF (ERP)</span>${carga.nota_fiscal || '<span class="text-red-500">Pendente</span>'}</div>
+              <div><span class="text-[9px] text-slate-400 uppercase font-black tracking-widest block mb-0.5">Qtd. Paletes</span>${carga.wms_paletes.length} UN</div>
+            </div>
+            <div class="max-h-[350px] overflow-y-auto custom-scrollbar border border-slate-200 rounded bg-white">
+              <table class="w-full tb-compact">
+                <thead class="sticky top-0 z-10">
+                  <tr>
+                    <th class="text-left">LPN</th>
+                    <th class="text-left">Item</th>
+                    <th class="text-center">Lote</th>
+                    <th class="text-center">Qtd</th>
+                    <th class="text-left">Separador</th>
+                    <th class="text-left">Conferente</th>
+                    <th class="text-left">Loader</th>
+                    <th class="text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody>${linhasPaletes}</tbody>
+              </table>
+            </div>
+          </div>
+        `,
+        customClass: { popup: 'swal-wide-modal' },
+        showConfirmButton: false,
+        showCloseButton: true
+      });
+    }
+
+    async function autorizarLoading(idCarga) {
+      Swal.close(); 
+      let carga = cargasGlobais.find(c => c.id == idCarga);
+      
+      setTimeout(async () => {
+        const { value: formValues } = await Swal.fire({
+          title: 'Autorizar Veículo na Doca',
+          customClass: { popup: 'swal-desktop-modal' },
+          html: `
+            <div class="text-left text-sm mt-2">
+              <div class="grid grid-cols-2 gap-3">
+                <div class="col-span-1">
+                  <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Placa Oficial <span class="text-red-500">*</span></label>
+                  <input id="swal-placa" class="w-full bg-white border border-slate-300 p-2 rounded shadow-sm font-black uppercase text-slate-800 outline-none focus:border-indigo-500 text-xs" value="${carga.placa.includes('FAK') ? '' : carga.placa}">
+                </div>
+                <div class="col-span-1">
+                  <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Nome do Motorista <span class="text-red-500">*</span></label>
+                  <input id="swal-mot" class="w-full bg-white border border-slate-300 p-2 rounded shadow-sm font-bold uppercase text-slate-800 outline-none focus:border-indigo-500 text-xs" value="${carga.motorista || ''}">
+                </div>
+                <div class="col-span-2">
+                  <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">RG / CPF do Motorista</label>
+                  <input id="swal-doc" class="w-full bg-white border border-slate-300 p-2 rounded shadow-sm font-bold uppercase text-slate-800 outline-none focus:border-indigo-500 text-xs" value="${carga.rg_cpf || ''}">
+                </div>
+              </div>
+            </div>
+          `,
+          focusConfirm: false, showCancelButton: true, confirmButtonColor: '#4f46e5', confirmButtonText: '<i class="fa-solid fa-key"></i> Liberar Loading', cancelButtonText: 'Cancelar',
+          preConfirm: () => {
+            return {
+              placa: document.getElementById('swal-placa').value.trim().toUpperCase(),
+              mot: document.getElementById('swal-mot').value.trim().toUpperCase(),
+              doc: document.getElementById('swal-doc').value.trim().toUpperCase()
+            }
+          }
+        });
+
+        if (formValues) {
+          if(!formValues.placa || !formValues.mot) return Swal.fire('Atenção', 'Placa e Motorista são obrigatórios.', 'warning');
+          Swal.fire({title: 'Liberando...', allowOutsideClick: false, didOpen:()=>Swal.showLoading()});
+          
+          await client.from('wms_cargas').update({
+            placa: formValues.placa, motorista: formValues.mot, rg_cpf: formValues.doc, status: 'AG_LOADING'
+          }).eq('id', idCarga);
+
+          Swal.fire('Veículo Liberado!', 'O botão de Embarque já aparece no PDA da Doca.', 'success');
+          carregarProgressoCargas();
+        }
+      }, 300);
+    }
+
+    async function cancelarOperacaoCompleta(idCarga) {
+      Swal.close();
+      setTimeout(async () => {
+        const { isConfirmed } = await Swal.fire({
+          title: 'CANCELAR CARGA?',
+          html: `Esta ação é <b>IRREVERSÍVEL</b>.<br><br>Todo o progresso será desfeito. Os paletes retornarão para <b>AG. PUTAWAY (Transição)</b> na Armazenagem.`,
+          icon: 'error', showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#cbd5e1', confirmButtonText: '<i class="fa-solid fa-trash-can"></i> Sim, Cancelar', cancelButtonText: 'Manter'
+        });
+
+        if(isConfirmed) {
+          Swal.fire({title: 'Resetando...', allowOutsideClick: false, didOpen:()=>Swal.showLoading()});
+          
+          await client.from('wms_paletes').update({ 
+            carga_id: null, lpn_expedicao: null, status_expedicao: null, status: 'TRANSICAO', endereco: 'RETORNO DOCA', picking_por: null, conf_por: null, load_por: null 
+          }).eq('carga_id', idCarga);
+
+          await client.from('wms_cargas').delete().eq('id', idCarga);
+
+          Swal.fire('Cancelada!', 'A carga foi excluída e os paletes estão aguardando Putaway.', 'success');
+          carregarProgressoCargas();
+        }
+      }, 300);
+    }
+
+    async function informarNf(idCarga) {
+      Swal.close();
+      setTimeout(async () => {
+        const { value: notaFiscal } = await Swal.fire({
+          title: 'Informar Nota Fiscal',
+          html: `O carregamento está 100% concluído.<br><br><span class="text-xs font-bold text-slate-500">Informe o número da NF gerada no ERP para atrelar ao Romaneio:</span>`,
+          input: 'text', inputPlaceholder: 'Ex: 00581452', icon: 'info',
+          showCancelButton: true, confirmButtonColor: '#3b82f6', confirmButtonText: 'Salvar NF', cancelButtonText: 'Cancelar',
+          inputValidator: (value) => { if (!value) return 'Você precisa digitar o número da NF!' }
+        });
+
+        if (notaFiscal) {
+          Swal.fire({title: 'Salvando...', allowOutsideClick: false, didOpen:()=>Swal.showLoading()});
+          
+          await client.from('wms_cargas').update({ nota_fiscal: notaFiscal.trim().toUpperCase() }).eq('id', idCarga);
+          
+          // Correção: Fecha o alerta de "Salvando" e dá o refresh na tela
+          Swal.fire({title: 'NF Salva!', icon: 'success', timer: 1500, showConfirmButton: false});
+          carregarProgressoCargas();
+        }
+      }, 300);
+    }
+
+    async function emitirSec(carga) {
+      Swal.close();
+      setTimeout(async () => {
+        const { isConfirmed } = await Swal.fire({
+          title: 'Emitir Romaneio (SEC)?',
+          html: `A carga <b>#${carga.id}</b> já possui a NF <b>${carga.nota_fiscal}</b>.<br><br>Confirma a Saída Efetiva do Caminhão e a baixa no estoque do WMS?`,
+          icon: 'question', showCancelButton: true, confirmButtonColor: '#10b981', confirmButtonText: 'Sim, Emitir SEC', cancelButtonText: 'Revisar'
+        });
+
+        if (isConfirmed) {
+          Swal.fire({title: 'Baixando Estoque...', allowOutsideClick: false, didOpen:()=>Swal.showLoading()});
+          const user = JSON.parse(localStorage.getItem('flowWmsUser')) || {nome:'Gestor SEC'};
+
+          await client.from('wms_cargas').update({ 
+            status: 'EXPEDIDA', expedido_por: user.nome, expedido_em: new Date().toISOString() 
+          }).eq('id', carga.id);
+          
+          await client.from('wms_paletes').update({ 
+            status_expedicao: 'EXPEDIDO', status: 'EXPEDIDO', endereco: 'EXPEDIDO' 
+          }).eq('carga_id', carga.id);
+
+          Swal.close(); 
+          imprimirRomaneio({...carga, expedido_por: user.nome, expedido_em: new Date().toISOString()});
+          carregarProgressoCargas();
+        }
+      }, 300);
+    }
+
+    function imprimirRomaneio(carga) {
+      let dtExp = carga.expedido_em ? new Date(carga.expedido_em).toLocaleString('pt-BR') : new Date().toLocaleString('pt-BR');
+      let area = document.getElementById('areaRomaneio');
+      
+      let loaderSet = new Set();
+      let linhasTb = '';
+      carga.wms_paletes.forEach(p => {
+        if(p.load_por) loaderSet.add(p.load_por);
+        let prod = produtosGlobais[p.n_item] || { descricao: 'S/ DESC', cod_moove: 'N/A', cod_pax: 'N/A' };
+        linhasTb += `
+          <tr>
+            <td style="font-weight: 900;">${p.lpn_expedicao}</td>
+            <td><b>ELV:</b> ${p.n_item}<br><span style="font-size: 7.5px; color: #475569;">MOV: ${prod.cod_moove} | PAX: ${prod.cod_pax}</span></td>
+            <td style="text-align: left; font-size: 8px; font-weight: bold;">${prod.descricao}</td>
+            <td style="font-weight: 900;">${p.lote}</td>
+            <td style="font-weight: 900; font-size: 10px;">${p.qtd}</td>
+          </tr>
+        `;
+      });
+
+      let loaderName = Array.from(loaderSet).join(', ') || '___________________________';
+
+      area.innerHTML = `
+        <div class="rom-header">
+          <div>
+            <h1 class="rom-title">ROMANEIO DE EMBARQUE (SEC)</h1>
+            <p class="rom-meta">DATA/HORA SAÍDA: ${dtExp}</p>
+          </div>
+          <div style="text-align: right;">
+            <h2 class="rom-pick">PICKING #${carga.id}</h2>
+            <p class="rom-meta">PLACA WMS: ${carga.placa}</p>
+          </div>
+        </div>
+        
+        <div class="rom-info-box">
+          <div class="rom-info-col">
+            <p>MOTORISTA: <b>${carga.motorista || 'N/A'}</b></p>
+            <p>RG/CPF MOTORISTA: <b>${carga.rg_cpf || 'N/A'}</b></p>
+            <p>TRANSPORTADORA: <b>${carga.transportadora || 'N/A'}</b></p>
+          </div>
+          <div class="rom-info-col">
+            <p>CLIENTE: <b>${carga.cliente}</b></p>
+            <p>DESTINO / REGIÃO: <b>${carga.destino || 'N/A'}</b></p>
+            <p style="color: #0f172a; font-weight: 900; background-color: #f1f5f9; padding: 2px 4px; border-radius: 4px; border: 1px solid #cbd5e1; display: inline-block;">NOTA FISCAL: ${carga.nota_fiscal || 'S/N'}</p>
+            <p>EMISSOR (SEC): <b>${carga.expedido_por || 'N/A'}</b></p>
+          </div>
+        </div>
+
+        <div style="font-size: 10px; font-weight: 900; background: #f1f5f9; padding: 6px; text-align: center; border: 1px solid #cbd5e1; border-radius: 4px; color: #0f172a; margin-bottom: 10px;">
+          CONCILIAÇÃO DO SISTEMA: SEPARAÇÃO (100%) | AUDITORIA CEGAS (100%) | EMBARQUE DOCA (100%)
+        </div>
+
+        <table class="romaneio-tb">
+          <thead>
+            <tr>
+              <th style="width: 15%;">LPN (SSCC)</th>
+              <th style="width: 20%;">CÓDIGOS</th>
+              <th style="width: 42%;">DESCRIÇÃO TÉCNICA</th>
+              <th style="width: 13%;">LOTE</th>
+              <th style="width: 10%;">QTD</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${linhasTb}
+          </tbody>
+        </table>
+
+        <div class="rom-assinaturas">
+          <div class="rom-ass-box">
+            <div class="rom-linha">ASSINATURA MOTORISTA RESPONSÁVEL</div>
+            <p class="rom-ass-meta">${carga.motorista || 'NOME ILEGÍVEL'}</p>
+            <p class="rom-ass-meta">CPF/RG: ${carga.rg_cpf || '_______________'}</p>
+          </div>
+          <div class="rom-ass-box">
+            <div class="rom-linha">CONFERENTE DOCA / LOADING</div>
+            <p class="rom-ass-meta">NOME LEGÍVEL: <span style="color:#0f172a; font-weight:900;">${loaderName}</span></p>
+            <p class="rom-ass-meta">MATRÍCULA / RG: _________________________</p>
+          </div>
+        </div>
+      `;
+
+      document.body.classList.add('print-mode');
+      window.print();
+      document.body.classList.remove('print-mode');
+    }
+  </script>
+</body>
+</html>

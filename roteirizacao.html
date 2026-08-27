@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Roteirização de Cargas</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #f8fafc; padding: 1.5rem; margin: 0; }
+    .card-desktop { background: white; border-radius: 1rem; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+    .tab-btn { padding: 0.75rem 1.5rem; font-weight: 800; font-size: 0.85rem; color: #64748b; border-bottom: 3px solid transparent; transition: all 0.2s; cursor: pointer; text-transform: uppercase; letter-spacing: 0.05em; }
+    .tab-btn:hover { color: #f59e0b; background-color: #fef3c7; }
+    .tab-btn.active { color: #d97706; border-bottom-color: #f59e0b; background-color: #fffbeb; }
+    
+    .tb-compact th { padding: 0.75rem 1rem; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em; color: #475569; background: #f1f5f9; border-bottom: 2px solid #e2e8f0; position: sticky; top: 0; z-index: 10; }
+    .tb-compact td { padding: 0.75rem 1rem; font-size: 0.75rem; color: #334155; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+    .tb-compact tr:hover { background-color: #fffbeb; }
+
+    details > summary { list-style: none; outline: none; }
+    details > summary::-webkit-details-marker { display: none; }
+
+    @media print {
+      @page { size: 158mm 108mm; margin: 0; }
+      body { background: white !important; padding: 0 !important; margin: 0 !important; }
+      body * { visibility: hidden; }
+      #areaImpressao, #areaImpressao * { visibility: visible; }
+      #areaImpressao { position: absolute; left: 0; top: 0; width: 158mm; display: block !important; padding-top: 2mm; }
+      .etiqueta-page { width: 140mm; height: 90mm; margin: 0 auto; margin-bottom: 18mm; page-break-after: always; border: 2px solid #000; box-sizing: border-box; padding: 4px; display: flex; flex-direction: column; font-family: Arial, sans-serif; }
+      .lbl-title { font-size: 10px; font-weight: bold; background: #cbd5e1; padding: 2px 4px; text-transform: uppercase; border: 1px solid #000; }
+      .lbl-val { font-size: 16px; font-weight: 900; padding: 4px; border: 1px solid #000; text-align: center; }
+      .lbl-desc { font-size: 14px; font-weight: 900; padding: 4px; border: 1px solid #000; }
+      .tb-etiq { width: 100%; border-collapse: collapse; }
+    }
+  </style>
+</head>
+<body class="text-slate-800">
+
+  <div class="max-w-[1500px] mx-auto flex flex-col h-[88vh] esconder-impressao gap-4">
+    
+    <div class="flex justify-between items-end bg-white rounded-xl border border-slate-200 shadow-sm pt-4 px-6 shrink-0 border-t-4 border-t-amber-500">
+      <div class="flex items-center gap-3 pb-4">
+        <div class="w-10 h-10 bg-amber-50 text-amber-500 rounded-lg flex items-center justify-center text-lg border border-amber-100"><i class="fa-solid fa-boxes-packing"></i></div>
+        <div>
+          <h1 class="text-xl font-black text-slate-800 tracking-tight leading-none">Roteirização e Cargas</h1>
+          <p class="text-slate-500 font-bold text-xs mt-1">Geração de Veículos, Edição de Paletes e Impressão LPN</p>
+        </div>
+      </div>
+      <div class="flex">
+        <div id="tabMontar" class="tab-btn active rounded-t-lg" onclick="mudarAba('montar')"><i class="fa-solid fa-list-ul mr-2"></i> Saldo Livre (Montagem)</div>
+        <div id="tabGestao" class="tab-btn rounded-t-lg" onclick="mudarAba('gestao')"><i class="fa-solid fa-clock-rotate-left mr-2"></i> Histórico de Pickings</div>
+      </div>
+    </div>
+
+    <!-- ABA 1: MONTAR ROTEIRO (ETAPAS 1 E 2) -->
+    <div id="viewMontar" class="flex flex-col flex-1 overflow-hidden">
+      
+      <!-- PASSO 1: SELEÇÃO AGRUPADA -->
+      <div id="step1-selecao" class="flex-1 overflow-hidden card-desktop flex flex-col bg-white">
+        <div class="bg-slate-50 border-b border-slate-200 px-4 py-3 flex justify-between items-center">
+          <h3 class="font-black text-slate-700 uppercase tracking-widest text-xs flex items-center gap-2"><i class="fa-solid fa-cubes text-blue-600"></i> Saldo Livre Agrupado (WMS)</h3>
+          
+          <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] font-bold text-slate-500 uppercase">Filtrar Cliente:</span>
+              <select id="filtroCliente" onchange="renderizarTabelaLivre()" class="text-xs font-bold py-1.5 px-2 border border-slate-300 rounded outline-none text-blue-900 bg-white cursor-pointer shadow-sm">
+                <option value="TODOS">TODOS OS CLIENTES</option>
+              </select>
+            </div>
+            <button onclick="carregarEstoqueLivre()" class="bg-white border border-slate-300 text-slate-600 hover:bg-slate-50 px-3 py-1.5 rounded text-xs font-black shadow-sm transition-colors"><i class="fa-solid fa-rotate-right mr-1"></i> Atualizar</button>
+            <button onclick="avancarParaEdicaoCargas()" class="bg-amber-500 hover:bg-amber-600 text-white px-5 py-1.5 rounded text-xs font-black shadow-md transition-colors active:scale-95"><i class="fa-solid fa-truck-fast mr-1"></i> Montar Pré-Cargas</button>
+          </div>
+        </div>
+        
+        <div class="flex-1 overflow-y-auto custom-scrollbar">
+          <table class="w-full text-left tb-compact">
+            <thead>
+              <tr>
+                <th class="w-[5%] text-center"><input type="checkbox" onclick="toggleAll(this)" class="w-3.5 h-3.5 cursor-pointer" checked></th>
+                <th class="w-[15%]">Item</th>
+                <th class="w-[30%]">Descrição Técnica</th>
+                <th class="w-[15%]">Cliente</th>
+                <th class="w-[15%] text-center">Lote Físico</th>
+                <th class="w-[20%] text-center text-amber-600">Total Livre (Paletes / Peças)</th>
+              </tr>
+            </thead>
+            <tbody id="tbLivre"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- PASSO 2: EDIÇÃO DE CARRETAS TEMPORÁRIAS -->
+      <div id="step2-edicao" class="hidden flex-1 flex-col overflow-hidden bg-slate-50/50">
+        <div class="bg-slate-800 text-white p-4 rounded-xl shadow-lg mb-4 flex justify-between items-center shrink-0">
+          <div>
+            <h2 class="text-lg font-black tracking-widest uppercase"><i class="fa-solid fa-truck-ramp-box text-amber-400 mr-2"></i> Simulador de Cargas</h2>
+            <p class="text-xs font-medium text-slate-300 mt-1">Os veículos foram divididos em 34 paletes. Use as setas para remanejar o saldo antes de gravar.</p>
+          </div>
+          <button onclick="voltarParaSelecao()" class="bg-slate-600 hover:bg-slate-500 text-white px-4 py-2 rounded-lg text-xs font-black transition-colors shadow-sm"><i class="fa-solid fa-arrow-left mr-1"></i> Voltar à Seleção</button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto custom-scrollbar pb-10" id="containerVeiculosTemp">
+          <!-- Os cards de carretas vão renderizar aqui -->
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ABA 2: GESTÃO DE PICKINGS (JÁ GRAVADOS) -->
+    <div id="viewGestao" class="hidden flex-1 overflow-hidden card-desktop flex flex-col bg-white">
+      <div class="bg-slate-50 border-b border-slate-200 p-4 flex justify-between items-center rounded-t-xl">
+        <h3 class="font-black text-slate-700 uppercase tracking-widest text-xs"><i class="fa-solid fa-list-ol text-emerald-500 mr-1"></i> Filas de Separação (Pickings)</h3>
+        <button onclick="carregarCargasAtivas()" class="text-emerald-600 hover:text-emerald-700 text-[10px] font-black uppercase bg-emerald-100 px-3 py-1.5 rounded border border-emerald-200 transition-colors shadow-sm"><i class="fa-solid fa-rotate-right mr-1"></i> Atualizar Lista</button>
+      </div>
+      <div class="flex-1 overflow-y-auto custom-scrollbar p-4 bg-slate-50/30" id="listaCargasGravadas">
+        <div class="text-center text-slate-400 py-10 font-bold"><i class="fa-solid fa-spinner fa-spin"></i> Carregando...</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CONTAINER PARA PDF ZEBRA -->
+  <div id="areaImpressao" class="hidden"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <script>
+    const client = window.supabase.createClient('https://cbrwmscaidyeaamyfiyt.supabase.co', 'sb_publishable_neiGbVa2X1nBfX5wT3UGYw_3RWe43_G');
+    let saldoAgrupadoGlobal = [];
+    let carretasTempGlobal = [];
+    let produtosGlobais = {};
+    let idSimuladorCarreta = 1;
+
+    window.onload = () => carregarEstoqueLivre();
+
+    function mudarAba(aba) {
+      document.getElementById('tabMontar').classList.remove('active');
+      document.getElementById('tabGestao').classList.remove('active');
+      document.getElementById('viewMontar').classList.add('hidden');
+      document.getElementById('viewGestao').classList.add('hidden');
+
+      if (aba === 'montar') {
+        document.getElementById('tabMontar').classList.add('active');
+        document.getElementById('viewMontar').classList.remove('hidden');
+        document.getElementById('viewMontar').classList.add('flex');
+        carregarEstoqueLivre();
+      } else {
+        document.getElementById('tabGestao').classList.add('active');
+        document.getElementById('viewGestao').classList.remove('hidden');
+        document.getElementById('viewGestao').classList.add('flex');
+        carregarCargasAtivas();
+      }
+    }
+
+    // ==========================================
+    // ETAPA 1: SALDO LIVRE (AGRUPADO)
+    // ==========================================
+    async function carregarEstoqueLivre() {
+      document.getElementById('tbLivre').innerHTML = '<tr><td colspan="6" class="text-center py-10 font-bold text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Calculando saldos...</td></tr>';
+      
+      const {data: prods} = await client.from('produtos_moove').select('*');
+      if(prods) prods.forEach(p => produtosGlobais[p.n_item] = p);
+
+      const {data: ctrl} = await client.from('controle_op').select('*').eq('status_expedicao', 'LIBERADO');
+      let lotesLiberados = new Set();
+      if(ctrl) ctrl.forEach(c => lotesLiberados.add(`${c.n_item}_${c.lote}`));
+
+      // Busca apenas pallets livres (Sem carga e não expedidos)
+      const {data: paletes} = await client.from('wms_paletes').select('*').eq('status', 'ARMAZENADO').is('carga_id', null);
+      
+      let mapaAgrupado = {};
+      let clientesSet = new Set();
+
+      if(paletes) {
+        paletes.forEach(p => {
+          if(lotesLiberados.has(`${p.n_item}_${p.lote}`)) {
+            let cli = (produtosGlobais[p.n_item] && produtosGlobais[p.n_item].cliente) ? produtosGlobais[p.n_item].cliente : 'S/ CLIENTE';
+            clientesSet.add(cli);
+            
+            let chave = `${p.n_item}_${p.lote}`;
+            if(!mapaAgrupado[chave]) {
+              mapaAgrupado[chave] = { 
+                n_item: p.n_item, 
+                lote: p.lote, 
+                cliente: cli, 
+                desc: produtosGlobais[p.n_item] ? produtosGlobais[p.n_item].descricao : 'S/ DESC',
+                total_pecas: 0, 
+                paletes_obj: [] 
+              };
+            }
+            mapaAgrupado[chave].total_pecas += parseFloat(p.qtd);
+            mapaAgrupado[chave].paletes_obj.push(p); // Guarda o objeto inteiro do palete
+          }
+        });
+      }
+
+      saldoAgrupadoGlobal = Object.values(mapaAgrupado);
+
+      let selCli = document.getElementById('filtroCliente');
+      selCli.innerHTML = '<option value="TODOS">TODOS OS CLIENTES</option>';
+      clientesSet.forEach(c => selCli.innerHTML += `<option value="${c}">${c}</option>`);
+
+      renderizarTabelaLivre();
+    }
+
+    function renderizarTabelaLivre() {
+      let filtro = document.getElementById('filtroCliente').value;
+      let tb = document.getElementById('tbLivre');
+      let html = '';
+
+      saldoAgrupadoGlobal.forEach((item, index) => {
+        if(filtro !== 'TODOS' && item.cliente !== filtro) return;
+        
+        let totalPlts = item.paletes_obj.length;
+        
+        html += `
+          <tr class="hover:bg-amber-50/40 transition-colors">
+            <td class="text-center"><input type="checkbox" class="chk-agrupado w-3.5 h-3.5 cursor-pointer" value="${index}" checked></td>
+            <td class="font-black text-slate-700 text-xs">${item.n_item}</td>
+            <td class="font-bold text-slate-500 text-[11px] truncate max-w-[250px]" title="${item.desc}">${item.desc}</td>
+            <td class="font-black text-[10px] uppercase text-indigo-700 tracking-widest">${item.cliente}</td>
+            <td class="text-center font-black text-slate-800 text-xs">${item.lote}</td>
+            <td class="text-center">
+              <span class="font-black text-amber-600 text-sm mr-1">${totalPlts} PLTS</span>
+              <span class="text-[9px] font-bold text-slate-400">(${item.total_pecas} UN)</span>
+            </td>
+          </tr>`;
+      });
+
+      tb.innerHTML = html || '<tr><td colspan="6" class="text-center py-8 font-bold text-slate-400">Nenhum saldo livre encontrado.</td></tr>';
+    }
+
+    function toggleAll(el) { document.querySelectorAll('.chk-agrupado').forEach(chk => chk.checked = el.checked); }
+
+    function voltarParaSelecao() {
+      document.getElementById('step2-edicao').classList.add('hidden');
+      document.getElementById('step2-edicao').classList.remove('flex');
+      document.getElementById('step1-selecao').classList.remove('hidden');
+      document.getElementById('step1-selecao').classList.add('flex');
+    }
+
+    // ==========================================
+    // ETAPA 2: MOTOR DE GERAÇÃO E SIMULADOR
+    // ==========================================
+    function avancarParaEdicaoCargas() {
+      let selecionados = [];
+      document.querySelectorAll('.chk-agrupado:checked').forEach(chk => {
+        selecionados.push(saldoAgrupadoGlobal[chk.value]);
+      });
+
+      if(selecionados.length === 0) return Swal.fire('Atenção', 'Selecione pelo menos um Item/Lote.', 'warning');
+
+      // Pega todos os paletes individuais de dentro dos agrupamentos selecionados
+      let poolPaletesFisicos = [];
+      selecionados.forEach(grupo => {
+        poolPaletesFisicos.push(...grupo.paletes_obj);
+      });
+
+      // Ordena por Item e Lote
+      poolPaletesFisicos.sort((a, b) => {
+        if (a.n_item < b.n_item) return -1; if (a.n_item > b.n_item) return 1;
+        if (a.lote < b.lote) return -1; if (a.lote > b.lote) return 1;
+        return 0;
+      });
+
+      // Split em carretas de 34
+      idSimuladorCarreta = 1;
+      carretasTempGlobal = [];
+
+      while(poolPaletesFisicos.length > 0) {
+        let chunk = poolPaletesFisicos.splice(0, 34);
+        carretasTempGlobal.push({
+          id_temp: idSimuladorCarreta++,
+          cliente: chunk[0] ? produtosGlobais[chunk[0].n_item]?.cliente || 'S/ CLIENTE' : 'MISTO',
+          paletes: chunk
+        });
+      }
+
+      document.getElementById('step1-selecao').classList.add('hidden');
+      document.getElementById('step1-selecao').classList.remove('flex');
+      document.getElementById('step2-edicao').classList.remove('hidden');
+      document.getElementById('step2-edicao').classList.add('flex');
+
+      renderizarSimulador();
+    }
+
+    function renderizarSimulador() {
+      const container = document.getElementById('containerVeiculosTemp');
+      container.innerHTML = '';
+
+      if(carretasTempGlobal.length === 0) {
+        container.innerHTML = '<div class="text-center py-10 font-bold text-slate-400">Todas as carretas foram esvaziadas.</div>';
+        return;
+      }
+
+      carretasTempGlobal.forEach(c => {
+        // Re-agrupa os paletes da carreta para exibir bonito
+        let mapExibicao = {};
+        c.paletes.forEach(p => {
+          let k = `${p.n_item}_${p.lote}`;
+          if(!mapExibicao[k]) mapExibicao[k] = { n_item: p.n_item, lote: p.lote, count: 0, pecas: 0, desc: produtosGlobais[p.n_item]?.descricao };
+          mapExibicao[k].count++;
+          mapExibicao[k].pecas += parseFloat(p.qtd);
+        });
+
+        let linhasHtml = '';
+        for(let k in mapExibicao) {
+          let item = mapExibicao[k];
+          linhasHtml += `
+            <tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+              <td class="py-2 px-3 text-center">
+                <button onclick="moverPaletes(${c.id_temp}, '${item.n_item}', '${item.lote}', ${item.count})" class="text-blue-500 hover:text-white hover:bg-blue-500 border border-blue-300 p-1.5 rounded transition-colors shadow-sm" title="Mover Paletes para outra Carreta">
+                  <i class="fa-solid fa-arrow-right-arrow-left text-xs"></i>
+                </button>
+              </td>
+              <td class="py-2 px-3 font-bold text-slate-700 text-xs">${item.n_item}</td>
+              <td class="py-2 px-3 font-bold text-slate-500 text-[10px] truncate max-w-[200px]" title="${item.desc}">${item.desc}</td>
+              <td class="py-2 px-3 font-black text-slate-800 text-xs text-center">${item.lote}</td>
+              <td class="py-2 px-3 text-center font-black text-amber-600 text-sm">${item.count}</td>
+              <td class="py-2 px-3 text-center font-black text-slate-400 text-xs">${item.pecas}</td>
+            </tr>
+          `;
+        }
+
+        let totalPlts = c.paletes.length;
+        let corAlerta = totalPlts > 34 ? 'text-red-500 bg-red-50 border-red-200' : 'text-slate-600 bg-white border-slate-200';
+
+        container.innerHTML += `
+          <div class="bg-white rounded-xl border border-slate-200 p-5 mb-6 shadow-md relative overflow-hidden" id="cardCarreta_${c.id_temp}">
+            <div class="absolute top-0 left-0 w-full h-1 bg-amber-500"></div>
+            
+            <div class="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
+              <div class="flex items-center gap-4">
+                <span class="bg-slate-800 text-white font-black px-4 py-2 rounded-lg text-sm shadow-sm">VEÍCULO (PRÉVIA) #${c.id_temp}</span>
+                <span class="bg-slate-100 border border-slate-200 text-slate-600 px-3 py-1.5 rounded font-black text-[10px] uppercase tracking-widest">CLIENTE PREDOMINANTE: ${c.cliente}</span>
+              </div>
+              <div class="flex items-center gap-4">
+                <div class="text-right">
+                  <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">Capacidade</span>
+                  <span class="text-sm font-black px-2 py-0.5 rounded border ${corAlerta}">${totalPlts} / 34 PLTS</span>
+                </div>
+                <button onclick="gravarCarretaDefinitiva(${c.id_temp})" class="bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-lg text-xs font-black shadow-md transition-transform active:scale-95 flex items-center gap-2">
+                  <i class="fa-solid fa-cloud-arrow-up"></i> GRAVAR PICKING
+                </button>
+              </div>
+            </div>
+
+            <div class="table-container max-h-[250px] overflow-y-auto rounded-lg border border-slate-100">
+              <table class="w-full text-left">
+                <thead class="bg-slate-100 sticky top-0 z-10">
+                  <tr>
+                    <th class="py-2 px-3 w-10">Ação</th>
+                    <th class="py-2 px-3 text-[10px] font-black text-slate-500 uppercase">Item</th>
+                    <th class="py-2 px-3 text-[10px] font-black text-slate-500 uppercase">Descrição</th>
+                    <th class="py-2 px-3 text-[10px] font-black text-slate-500 uppercase text-center">Lote</th>
+                    <th class="py-2 px-3 text-[10px] font-black text-slate-500 uppercase text-center">Qtd. Paletes</th>
+                    <th class="py-2 px-3 text-[10px] font-black text-slate-500 uppercase text-center">Total Peças</th>
+                  </tr>
+                </thead>
+                <tbody>${linhasHtml}</tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    async function moverPaletes(idTempOrigem, nItem, lote, maxDisponivel) {
+      const { value: formValues } = await Swal.fire({
+        title: 'Mover Paletes',
+        html: `
+          <div class="text-left text-sm space-y-3 mt-2">
+            <div>
+              <label class="block text-[10px] font-black text-slate-500 uppercase">1. Quantos paletes quer mover? (Máx: ${maxDisponivel})</label>
+              <input type="number" id="swal-qtd" class="w-full bg-slate-50 border-2 border-slate-200 p-2.5 rounded-lg font-black text-blue-600 outline-none" value="1" min="1" max="${maxDisponivel}">
+            </div>
+            <div>
+              <label class="block text-[10px] font-black text-slate-500 uppercase">2. Para qual Veículo (Prévia #)?</label>
+              <input type="number" id="swal-dest" class="w-full bg-slate-50 border-2 border-slate-200 p-2.5 rounded-lg font-black text-slate-800 outline-none" placeholder="Ex: 2">
+            </div>
+          </div>
+        `,
+        focusConfirm: false, showCancelButton: true, confirmButtonText: '<i class="fa-solid fa-arrow-right-arrow-left"></i> Transferir', cancelButtonText: 'Cancelar',
+        preConfirm: () => {
+          return {
+            qtd: parseInt(document.getElementById('swal-qtd').value),
+            destino: parseInt(document.getElementById('swal-dest').value)
+          }
+        }
+      });
+
+      if(formValues) {
+        if(!formValues.qtd || formValues.qtd < 1 || formValues.qtd > maxDisponivel) return Swal.fire('Erro', 'Quantidade inválida.', 'error');
+        if(!formValues.destino) return Swal.fire('Erro', 'Informe o veículo de destino.', 'error');
+        if(formValues.destino === idTempOrigem) return Swal.fire('Aviso', 'O palete já está neste veículo.', 'info');
+
+        let cOrigem = carretasTempGlobal.find(c => c.id_temp === idTempOrigem);
+        let cDestino = carretasTempGlobal.find(c => c.id_temp === formValues.destino);
+
+        if(!cDestino) {
+          cDestino = { id_temp: formValues.destino, cliente: cOrigem.cliente, paletes: [] };
+          carretasTempGlobal.push(cDestino);
+        }
+
+        // Encontra os paletes exatos na origem e tira (splice)
+        let movidos = [];
+        for(let i = cOrigem.paletes.length - 1; i >= 0; i--) {
+          let p = cOrigem.paletes[i];
+          if(p.n_item === nItem && p.lote === lote) {
+            movidos.push(cOrigem.paletes.splice(i, 1)[0]);
+            if(movidos.length === formValues.qtd) break;
+          }
+        }
+
+        // Joga no destino
+        cDestino.paletes.push(...movidos);
+
+        // Limpa carretas vazias e reordena
+        carretasTempGlobal = carretasTempGlobal.filter(c => c.paletes.length > 0);
+        carretasTempGlobal.sort((a,b) => a.id_temp - b.id_temp);
+
+        renderizarSimulador();
+      }
+    }
+
+    async function gravarCarretaDefinitiva(idTemp) {
+      let carretaTemp = carretasTempGlobal.find(c => c.id_temp === idTemp);
+      if(!carretaTemp) return;
+
+      Swal.fire({title: 'Gravando Ordem...', allowOutsideClick: false, didOpen:()=>Swal.showLoading()});
+      const user = JSON.parse(localStorage.getItem('flowWmsUser')) || {nome:'Assistente'};
+
+      // 1. Cria a Carga Oficial
+      const {data: cargaSalva, error: errCarga} = await client.from('wms_cargas').insert([{
+        placa: 'A DEFINIR', transportadora: 'A DEFINIR', destino: 'A DEFINIR', cliente: carretaTemp.cliente, criado_por: user.nome
+      }]).select().single();
+
+      if(errCarga) return Swal.fire('Erro ao criar Carga', errCarga.message, 'error');
+
+      // 2. Atualiza os Paletes no Banco
+      for(let i=0; i < carretaTemp.paletes.length; i++) {
+        let p = carretaTemp.paletes[i];
+        let seqLPN = String(i+1).padStart(2, '0');
+        let lpn = `LPN-${cargaSalva.id}-${seqLPN}`; 
+        
+        await client.from('wms_paletes').update({ carga_id: cargaSalva.id, lpn_expedicao: lpn, status_expedicao: 'PENDENTE_PICKING' }).eq('id', p.id);
+      }
+
+      // 3. Remove a carreta do simulador e re-renderiza
+      carretasTempGlobal = carretasTempGlobal.filter(c => c.id_temp !== idTemp);
+      
+      Swal.fire({
+        title: 'Carga Efetivada!',
+        text: `A Ordem PICK #${cargaSalva.id} foi enviada para o Transporte/Picking.`,
+        icon: 'success', timer: 2000, showConfirmButton: false
+      });
+
+      renderizarSimulador();
+    }
+
+    // ==========================================
+    // ETAPA 3: GESTÃO DE PICKINGS (JÁ GRAVADOS)
+    // ==========================================
+    async function carregarCargasAtivas() {
+      const container = document.getElementById('listaCargasGravadas');
+      container.innerHTML = '<div class="text-center py-10 font-bold text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Buscando Pickings Oficiais...</div>';
+
+      const { data: cargas, error } = await client.from('wms_cargas').select('*, wms_paletes(*)').neq('status', 'EXPEDIDA').order('id', { ascending: false });
+
+      if(error || !cargas || cargas.length === 0) return container.innerHTML = '<div class="text-center py-16 font-bold text-slate-400 border border-dashed border-slate-200 rounded-xl bg-slate-50">Nenhuma ordem de expedição em andamento.</div>';
+
+      let html = '';
+      cargas.forEach(c => {
+        let qtdPlts = c.wms_paletes ? c.wms_paletes.length : 0;
+        let dtCriacao = c.created_at ? new Date(c.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '--/--/----';
+        let statusBadge = c.status === 'ROTEIRIZADA' ? '<span class="bg-amber-100 text-amber-700 px-2 py-0.5 rounded text-[9px] font-black uppercase border border-amber-200">Aguardando</span>' : `<span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[9px] font-black uppercase border border-blue-200">${c.status}</span>`;
+
+        let pltsHtml = '';
+        if(c.wms_paletes && c.wms_paletes.length > 0) {
+          c.wms_paletes.forEach(p => {
+             let desc = produtosGlobais[p.n_item] ? produtosGlobais[p.n_item].descricao : 'S/ DESC';
+             pltsHtml += `
+              <tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                <td class="py-1.5 px-3 font-black text-blue-600 w-1/5">${p.lpn_expedicao}</td>
+                <td class="py-1.5 px-3 text-[10px] font-bold text-slate-600"><span class="bg-slate-200 px-1 py-0.5 rounded mr-1">${p.n_item}</span> ${desc}</td>
+                <td class="py-1.5 px-3 text-center font-bold text-slate-500">${p.lote}</td>
+                <td class="py-1.5 px-3 text-center font-black text-slate-700">${p.qtd} UN</td>
+                <td class="py-1.5 px-3 text-right font-bold text-slate-500">${p.endereco}</td>
+              </tr>`;
+          });
+        }
+
+        html += `
+          <details class="group bg-white border border-slate-200 rounded-xl mb-3 shadow-sm overflow-hidden open:shadow-md transition-shadow">
+            <summary class="p-3 bg-white hover:bg-slate-50 cursor-pointer flex flex-wrap md:flex-nowrap justify-between items-center text-sm transition-colors outline-none select-none">
+              <div class="flex items-center gap-4 w-full md:w-auto mb-2 md:mb-0">
+                <span class="bg-slate-800 text-white px-2 py-1 rounded text-xs font-black w-24 text-center">PICK #${c.id}</span>
+                <span class="font-bold text-slate-600 truncate max-w-[200px]" title="${c.destino}"><i class="fa-solid fa-location-dot text-slate-400 mr-1"></i> ${c.destino}</span>
+                <span class="text-[10px] text-slate-500 font-bold border-l border-slate-300 pl-3">CLI: ${c.cliente}</span>
+                <span class="text-[10px] text-slate-400 font-medium ml-2">Criado por: ${c.criado_por}</span>
+              </div>
+              <div class="flex items-center gap-4 w-full md:w-auto justify-end">
+                <span class="text-[10px] font-bold text-slate-400"><i class="fa-regular fa-clock"></i> ${dtCriacao}</span>
+                ${statusBadge}
+                <span class="text-xs font-black text-slate-700 bg-slate-100 px-2 py-1 rounded"><i class="fa-solid fa-pallet text-amber-500 mr-1"></i> ${qtdPlts}</span>
+                <i class="fa-solid fa-chevron-down text-slate-300 group-open:rotate-180 transition-transform ml-2"></i>
+              </div>
+            </summary>
+            <div class="border-t border-slate-200 bg-slate-50/50 p-4">
+               <div class="flex gap-3 mb-4">
+                  <button onclick='imprimirLPNs(${JSON.stringify(c)})' class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-xs font-black shadow-sm transition-colors flex items-center gap-2"><i class="fa-solid fa-print"></i> Imprimir LPNs Zebra</button>
+               </div>
+               <div class="border border-slate-200 rounded-lg overflow-hidden bg-white max-h-[300px] overflow-y-auto custom-scrollbar">
+                 <table class="w-full text-left text-[11px] border-collapse">
+                   <thead class="bg-slate-100 border-b border-slate-200 sticky top-0">
+                     <tr>
+                       <th class="py-2 px-3 font-black text-slate-500 uppercase">LPN (SSCC)</th>
+                       <th class="py-2 px-3 font-black text-slate-500 uppercase">Item</th>
+                       <th class="py-2 px-3 font-black text-slate-500 uppercase text-center">Lote</th>
+                       <th class="py-2 px-3 font-black text-slate-500 uppercase text-center">Qtd</th>
+                       <th class="py-2 px-3 font-black text-slate-500 uppercase text-right">Origem (Endereço)</th>
+                     </tr>
+                   </thead>
+                   <tbody>${pltsHtml}</tbody>
+                 </table>
+               </div>
+            </div>
+          </details>
+        `;
+      });
+      container.innerHTML = html;
+    }
+
+    async function imprimirLPNs(carga) {
+      if(!carga.wms_paletes || carga.wms_paletes.length === 0) return Swal.fire('Erro', 'Carga sem paletes.', 'error');
+      let areaImpressao = document.getElementById('areaImpressao');
+      areaImpressao.innerHTML = '';
+      
+      for(let i=0; i < carga.wms_paletes.length; i++) {
+        let p = carga.wms_paletes[i];
+        let prod = produtosGlobais[p.n_item] || {};
+        let infoDestino = `${carga.destino || 'A DEFINIR'}`;
+        
+        let tagDiv = document.createElement('div');
+        tagDiv.className = 'etiqueta-page';
+        tagDiv.innerHTML = `
+          <table class="tb-etiq flex-1">
+            <tr><td class="lbl-title w-1/4">PICKING / DESTINO</td><td colspan="2" class="lbl-val text-sm uppercase">PICK #${carga.id} | ${infoDestino}</td></tr>
+            <tr><td class="lbl-title">DESCRIÇÃO</td><td colspan="2" class="lbl-desc uppercase">${prod.descricao || 'S/ DESCRIÇÃO'}</td></tr>
+            <tr>
+              <td class="lbl-title">LPN WMS</td>
+              <td class="lbl-val text-2xl w-1/2">${p.lpn_expedicao}</td>
+              <td class="lbl-val w-1/4" id="qr_print_${p.lpn_expedicao}"></td>
+            </tr>
+            <tr>
+              <td class="lbl-title">CÓDIGOS</td>
+              <td colspan="2" class="lbl-val text-[11px]">ELVIN: ${p.n_item} | MOOVE: ${prod.cod_moove || 'N/A'} | PAX: ${prod.cod_pax || 'N/A'}</td>
+            </tr>
+            <tr>
+              <td class="lbl-title">LOTE / QTD</td>
+              <td colspan="2" class="lbl-val text-lg">LOTE: ${p.lote} | QTD: ${p.qtd} UN</td>
+            </tr>
+          </table>`;
+        areaImpressao.appendChild(tagDiv);
+        await new Promise(resolve => setTimeout(() => {
+          new QRCode(document.getElementById(`qr_print_${p.lpn_expedicao}`), { text: p.lpn_expedicao, width: 70, height: 70, correctLevel : QRCode.CorrectLevel.L });
+          resolve();
+        }, 50));
+      }
+      document.body.classList.add('print-mode');
+      window.print();
+      document.body.classList.remove('print-mode');
+    }
+  </script>
+</body>
+</html>

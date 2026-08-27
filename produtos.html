@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FLOW WMS | Cadastro de Produtos</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; padding: 2rem; }
+    .card-modern { background: white; border-radius: 1.25rem; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+    .input-modern { width: 100%; background-color: #f8fafc; border: 2px solid #e2e8f0; color: #1e293b; font-weight: 700; border-radius: 0.75rem; padding: 0.75rem 1rem; outline: none; transition: all 0.2s; font-size: 0.875rem; }
+    .input-modern:focus { background-color: #ffffff; border-color: #8b5cf6; box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.1); }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+  </style>
+</head>
+<body class="flex flex-col h-[90vh]">
+
+  <div class="max-w-[1400px] w-full mx-auto flex flex-col lg:flex-row gap-6 h-full">
+    
+    <!-- LADO ESQUERDO: FORMULÁRIO -->
+    <div class="w-full lg:w-1/3 card-modern p-6 flex flex-col h-full border-t-4 border-t-purple-500">
+      <div class="flex items-center justify-between mb-6 border-b border-slate-100 pb-4">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center text-lg shadow-sm"><i class="fa-solid fa-box-open"></i></div>
+          <h2 class="text-xl font-black text-slate-800 uppercase tracking-tight" id="formTitulo">Novo Produto</h2>
+        </div>
+        <button id="btnCancelarEdit" onclick="cancelarEdicao()" class="hidden bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors">Cancelar</button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
+        <input type="hidden" id="isEdit" value="false">
+
+        <div>
+            <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Nº do Item (Código Principal) <span class="text-red-500">*</span></label>
+            <input type="text" id="n_item" class="input-modern uppercase" placeholder="Ex: E-PA-001">
+        </div>
+        
+        <div>
+            <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Descrição Completa <span class="text-red-500">*</span></label>
+            <textarea id="descricao" rows="2" class="input-modern uppercase resize-none" placeholder="Descrição do produto..."></textarea>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Cód. Moove</label>
+                <input type="text" id="cod_moove" class="input-modern uppercase" placeholder="Opcional">
+            </div>
+            <div>
+                <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Cód. Pax</label>
+                <input type="text" id="cod_pax" class="input-modern uppercase" placeholder="Opcional">
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-[10px] font-black text-purple-600 uppercase tracking-widest mb-1.5">Qtd / Palete <span class="text-red-500">*</span></label>
+                <input type="number" id="qtd_palete" class="input-modern bg-purple-50/50 border-purple-200 focus:border-purple-500" placeholder="0">
+            </div>
+            <div>
+                <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Peso Un. (KG) <span class="text-red-500">*</span></label>
+                <input type="number" step="0.01" id="peso" class="input-modern" placeholder="0.00">
+            </div>
+        </div>
+
+        <div>
+            <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Cliente (Marca) <span class="text-red-500">*</span></label>
+            <select id="cliente" class="input-modern cursor-pointer">
+                <option value="S/ CLIENTE">S/ CLIENTE</option>
+                <option value="MOOVE">MOOVE</option>
+                <option value="EVORA">EVORA</option>
+                <option value="TOYOTA">TOYOTA</option>
+            </select>
+        </div>
+      </div>
+
+      <div class="pt-4 border-t border-slate-100 mt-2 shrink-0">
+        <button onclick="salvarProduto()" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-black py-3.5 rounded-xl shadow-md transition-transform active:scale-95 flex items-center justify-center gap-2 uppercase tracking-wide text-sm">
+            <i class="fa-solid fa-floppy-disk"></i> Salvar Registro
+        </button>
+      </div>
+    </div>
+
+    <!-- LADO DIREITO: LISTAGEM -->
+    <div class="w-full lg:w-2/3 card-modern p-6 flex flex-col h-full">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 border-b border-slate-100 pb-4">
+        <h2 class="text-xl font-black text-slate-800 uppercase tracking-tight">Base de Produtos</h2>
+        <div class="relative w-full sm:w-64">
+            <input type="text" id="buscaListagem" onkeyup="buscarLista()" placeholder="Buscar item, desc ou cliente..." class="w-full bg-slate-50 border border-slate-200 text-sm font-bold rounded-xl pl-10 pr-4 py-2 outline-none focus:border-purple-500 transition-colors">
+            <i class="fa-solid fa-search absolute left-3.5 top-3 text-slate-400"></i>
+        </div>
+      </div>
+
+      <div class="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3" id="listaProdutos">
+        <div class="text-center text-slate-400 py-10 font-bold"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Carregando base...</div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const client = window.supabase.createClient('https://cbrwmscaidyeaamyfiyt.supabase.co', 'sb_publishable_neiGbVa2X1nBfX5wT3UGYw_3RWe43_G');
+    let listaGlobal = [];
+
+    window.onload = () => carregarTabela();
+
+    async function carregarTabela() {
+        const tb = document.getElementById('listaProdutos');
+        tb.innerHTML = '<div class="text-center text-slate-400 py-10 font-bold"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Atualizando...</div>';
+        
+        const { data, error } = await client.from('produtos_moove').select('*').order('n_item', { ascending: true });
+        
+        if (error) {
+            tb.innerHTML = '<div class="text-center text-red-500 py-10 font-bold">Erro ao carregar os dados.</div>';
+            return;
+        }
+        
+        listaGlobal = data || [];
+        renderizarLista(listaGlobal);
+    }
+
+    function renderizarLista(dados) {
+        const tb = document.getElementById('listaProdutos');
+        if (dados.length === 0) {
+            tb.innerHTML = '<div class="text-center text-slate-400 py-10 font-bold border-2 border-dashed border-slate-200 rounded-xl">Nenhum produto encontrado.</div>';
+            return;
+        }
+
+        let html = '';
+        dados.forEach(p => {
+            html += `
+            <div class="bg-white border border-slate-200 rounded-xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:shadow-md hover:border-purple-300 transition-all group">
+                <div class="flex-1">
+                    <div class="flex flex-wrap items-center gap-2 mb-1.5">
+                        <span class="bg-slate-100 border border-slate-200 text-slate-700 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest">${p.n_item}</span>
+                        <span class="text-[9px] font-black text-purple-600 bg-purple-50 border border-purple-100 px-2 py-0.5 rounded uppercase tracking-widest">${p.cliente}</span>
+                    </div>
+                    <h3 class="font-bold text-slate-800 text-sm leading-tight uppercase max-w-[400px] truncate" title="${p.descricao}">${p.descricao}</h3>
+                    <div class="flex flex-wrap items-center gap-3 mt-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                        <span>Fator: <b class="text-slate-700">${p.qtd_palete} UN</b></span>
+                        <span>|</span>
+                        <span>Peso: <b class="text-slate-700">${p.peso} KG</b></span>
+                        <span>|</span>
+                        <span>Moove: <b class="text-slate-700">${p.cod_moove && p.cod_moove !== 'N/A' ? p.cod_moove : '-'}</b></span>
+                        <span>|</span>
+                        <span>Pax: <b class="text-slate-700">${p.cod_pax && p.cod_pax !== 'N/A' ? p.cod_pax : '-'}</b></span>
+                    </div>
+                </div>
+                <div class="flex gap-2 w-full sm:w-auto">
+                    <button onclick='editarProduto(${JSON.stringify(p)})' class="flex-1 sm:flex-none bg-slate-50 border border-slate-200 hover:bg-purple-50 hover:text-purple-600 text-slate-500 px-3 py-2 rounded-lg text-xs font-bold transition-colors shadow-sm"><i class="fa-solid fa-pen"></i></button>
+                    <button onclick='excluirProduto("${p.n_item}")' class="flex-1 sm:flex-none bg-slate-50 border border-slate-200 hover:bg-red-50 hover:text-red-600 text-slate-500 px-3 py-2 rounded-lg text-xs font-bold transition-colors shadow-sm"><i class="fa-solid fa-trash"></i></button>
+                </div>
+            </div>`;
+        });
+        tb.innerHTML = html;
+    }
+
+    function buscarLista() {
+        const termo = document.getElementById('buscaListagem').value.toUpperCase().trim();
+        if (!termo) return renderizarLista(listaGlobal);
+        
+        const filtrado = listaGlobal.filter(p => 
+            p.n_item.toUpperCase().includes(termo) || 
+            p.descricao.toUpperCase().includes(termo) || 
+            (p.cliente && p.cliente.toUpperCase().includes(termo))
+        );
+        renderizarLista(filtrado);
+    }
+
+    async function salvarProduto() {
+        const n_item = document.getElementById('n_item').value.trim().toUpperCase();
+        const descricao = document.getElementById('descricao').value.trim().toUpperCase();
+        const cod_moove = document.getElementById('cod_moove').value.trim().toUpperCase() || null;
+        const cod_pax = document.getElementById('cod_pax').value.trim().toUpperCase() || null;
+        const qtd_palete = document.getElementById('qtd_palete').value;
+        const peso = document.getElementById('peso').value;
+        const cliente = document.getElementById('cliente').value;
+        const isEdit = document.getElementById('isEdit').value === "true";
+
+        if (!n_item || !descricao || !qtd_palete || !peso) {
+            return Swal.fire('Atenção', 'Preencha todos os campos obrigatórios (*).', 'warning');
+        }
+
+        Swal.fire({ title: 'Salvando...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+
+        if (!isEdit) {
+            const { data: check } = await client.from('produtos_moove').select('descricao').eq('n_item', n_item);
+            if (check && check.length > 0) {
+                return Swal.fire('Item Duplicado!', `O código <b>${n_item}</b> já pertence ao produto:<br><br><span class="text-sm text-slate-500">${check[0].descricao}</span>`, 'error');
+            }
+        }
+
+        const payload = {
+            n_item, descricao, cod_moove, cod_pax, 
+            qtd_palete: parseFloat(qtd_palete), 
+            peso: parseFloat(peso), 
+            cliente
+        };
+
+        let erroNoBanco = null;
+
+        if (isEdit) {
+            const { error } = await client.from('produtos_moove').update(payload).eq('n_item', n_item);
+            erroNoBanco = error;
+        } else {
+            const { error } = await client.from('produtos_moove').insert([payload]);
+            erroNoBanco = error;
+        }
+
+        if (erroNoBanco) {
+            return Swal.fire('Erro', erroNoBanco.message, 'error');
+        }
+
+        Swal.fire('Sucesso!', 'Produto salvo na base de dados.', 'success');
+        cancelarEdicao();
+        carregarTabela();
+    }
+
+    function editarProduto(p) {
+        document.getElementById('isEdit').value = "true";
+        document.getElementById('n_item').value = p.n_item;
+        document.getElementById('n_item').setAttribute('readonly', 'true');
+        document.getElementById('n_item').classList.add('bg-slate-200', 'cursor-not-allowed', 'text-slate-400');
+        
+        document.getElementById('descricao').value = p.descricao;
+        document.getElementById('cod_moove').value = p.cod_moove || "";
+        document.getElementById('cod_pax').value = p.cod_pax || "";
+        document.getElementById('qtd_palete').value = p.qtd_palete;
+        document.getElementById('peso').value = p.peso;
+        document.getElementById('cliente').value = p.cliente || "S/ CLIENTE";
+
+        document.getElementById('formTitulo').innerText = "Editando Produto";
+        document.getElementById('btnCancelarEdit').classList.remove('hidden');
+    }
+
+    function cancelarEdicao() {
+        document.getElementById('isEdit').value = "false";
+        document.getElementById('n_item').value = "";
+        document.getElementById('n_item').removeAttribute('readonly');
+        document.getElementById('n_item').classList.remove('bg-slate-200', 'cursor-not-allowed', 'text-slate-400');
+        
+        document.getElementById('descricao').value = "";
+        document.getElementById('cod_moove').value = "";
+        document.getElementById('cod_pax').value = "";
+        document.getElementById('qtd_palete').value = "";
+        document.getElementById('peso').value = "";
+        document.getElementById('cliente').value = "S/ CLIENTE";
+
+        document.getElementById('formTitulo').innerText = "Novo Produto";
+        document.getElementById('btnCancelarEdit').classList.add('hidden');
+    }
+
+    function excluirProduto(n_item) {
+        Swal.fire({
+            title: 'Você tem certeza?',
+            text: `Isso apagará o produto ${n_item} da base. Histórico em OPs e Estoque será mantido, mas o cadastro sumirá.`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            cancelButtonColor: '#cbd5e1',
+            confirmButtonText: 'Sim, deletar!',
+            cancelButtonText: 'Cancelar'
+        }).then(async (result) => {
+            if (result.isConfirmed) {
+                Swal.fire({ title: 'Deletando...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+                const { error } = await client.from('produtos_moove').delete().eq('n_item', n_item);
+                if (error) return Swal.fire('Erro', error.message, 'error');
+                Swal.fire('Deletado!', 'Produto removido com sucesso.', 'success');
+                carregarTabela();
+            }
+        });
+    }
+  </script>
+</body>
+</html>

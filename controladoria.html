@@ -2,154 +2,446 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FLOW WMS | Kanban Controladoria</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
-    body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
-    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
-    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+    body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; padding: 1.5rem; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+    .card-modern { background: white; border-radius: 1.25rem; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 8px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    
+    /* Kanban Column Styles */
+    .kanban-col { min-width: 320px; width: 320px; max-height: 100%; display: flex; flex-direction: column; background-color: #f8fafc; border-radius: 1rem; border: 1px solid #e2e8f0; }
+    .kanban-header { padding: 1rem; border-bottom: 2px solid #e2e8f0; border-top-left-radius: 1rem; border-top-right-radius: 1rem; }
+    .kanban-body { flex: 1; overflow-y: auto; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.75rem; }
+    
+    /* Card Styles */
+    .k-card { background: white; border: 1px solid #e2e8f0; border-radius: 0.75rem; padding: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.02); transition: all 0.2s ease; position: relative; overflow: hidden; }
+    .k-card:hover { transform: translateY(-2px); box-shadow: 0 8px 15px -3px rgba(0,0,0,0.1); border-color: #cbd5e1; }
+    .k-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
+    
+    .k-card.prod::before { background-color: #94a3b8; }
+    .k-card.wait::before { background-color: #f59e0b; }
+    .k-card.analise::before { background-color: #3b82f6; }
+    .k-card.block::before { background-color: #ef4444; }
+    .k-card.lib::before { background-color: #10b981; }
+
+    /* Estilos do Modal Swal */
+    .swal-desktop-modal { border-radius: 1.5rem !important; }
   </style>
 </head>
-<body class="p-8">
+<body>
 
-  <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-    <div class="flex items-center gap-5">
-      <div class="bg-gradient-to-br from-[#001A70] to-blue-800 p-4 rounded-2xl shadow-lg text-white">
-        <i class="fa-solid fa-file-signature text-3xl"></i>
+  <!-- HEADER -->
+  <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-5 rounded-2xl shadow-sm border border-slate-200 border-l-4 border-l-[#001A70] shrink-0 mb-4">
+    <div class="flex items-center gap-4">
+      <div class="bg-blue-50 text-blue-700 w-12 h-12 rounded-xl flex items-center justify-center shadow-[0_4px_14px_0_rgba(29,78,216,0.25)]">
+        <i class="fa-solid fa-layer-group text-2xl"></i>
       </div>
       <div>
-        <h1 class="text-2xl font-black text-slate-800 uppercase tracking-tight">Painel de Controladoria</h1>
-        <p class="text-slate-500 font-bold text-sm">Liberação Sistêmica de O.P. e Expedição</p>
+        <h1 class="text-2xl font-black text-slate-800 tracking-tight leading-none">Kanban de Controladoria</h1>
+        <p class="text-slate-500 font-bold text-[11px] mt-1 uppercase tracking-widest">Fluxo Contínuo de Lotes e Liberação de OPs</p>
       </div>
     </div>
     
-    <div class="flex items-center gap-4">
-      <div class="bg-slate-50 px-5 py-3 border-2 border-slate-100 rounded-2xl flex items-center gap-3">
-        <div class="bg-blue-100 text-blue-700 p-2 rounded-lg"><i class="fa-solid fa-calendar-day"></i></div>
-        <div class="flex flex-col">
-          <label class="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest">Estoque do Dia</label>
-          <input type="date" id="filtroDataCtrl" class="text-sm font-black text-slate-800 border-none outline-none cursor-pointer bg-transparent" onchange="carregarDadosControladoria()">
-        </div>
+    <div class="flex items-center gap-3">
+      <!-- CAMPO DE RASTREIO E AUDITORIA -->
+      <div class="flex items-center bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 shadow-inner focus-within:border-[#001A70] focus-within:bg-white transition-all">
+         <input type="text" id="inputRastreioLote" placeholder="Rastrear Lote..." class="bg-transparent text-xs font-bold outline-none text-slate-700 uppercase w-32 md:w-48" onkeydown="if(event.key === 'Enter') buscarRastreioLote()">
+         <button onclick="buscarRastreioLote()" class="text-slate-400 hover:text-[#001A70] px-1 transition-colors" title="Rastrear histórico completo"><i class="fa-solid fa-search"></i></button>
       </div>
-      <button onclick="carregarDadosControladoria()" class="bg-[#0055A5] hover:bg-blue-700 text-white p-4 rounded-2xl shadow-md active:scale-95">
-        <i class="fa-solid fa-rotate-right"></i>
+      <button onclick="carregarKanban()" class="bg-[#001A70] hover:bg-blue-900 text-white px-5 py-2.5 rounded-xl shadow-md transition-transform active:scale-95 flex items-center gap-2 font-black text-xs">
+        <i class="fa-solid fa-rotate-right"></i> Atualizar
       </button>
     </div>
   </div>
 
-  <div class="bg-white rounded-3xl shadow-sm border border-slate-100 p-2 flex-1 flex flex-col h-[65vh]">
-    <div class="overflow-y-auto custom-scrollbar rounded-2xl flex-1">
-      <table class="w-full text-left border-collapse min-w-[800px]">
-        <thead>
-          <tr>
-            <th class="bg-[#001A70] text-white text-xs font-black uppercase tracking-wider p-4 sticky top-0 rounded-tl-2xl">Item</th>
-            <th class="bg-[#001A70] text-white text-xs font-black uppercase tracking-wider p-4 sticky top-0">Descrição</th>
-            <th class="bg-[#001A70] text-white text-xs font-black uppercase tracking-wider p-4 sticky top-0 text-center">Lote</th>
-            <th class="bg-[#001A70] text-white text-xs font-black uppercase tracking-wider p-4 sticky top-0 text-center">Volume (UN)</th>
-            <th class="bg-[#001A70] text-white text-xs font-black uppercase tracking-wider p-4 sticky top-0 text-center border-l border-blue-800">Status O.P.</th>
-            <th class="bg-[#001A70] text-white text-xs font-black uppercase tracking-wider p-4 sticky top-0 text-center rounded-tr-2xl">Liberação Expedição</th>
-          </tr>
-        </thead>
-        <tbody id="corpoTabelaControladoria">
-          <tr><td colspan="6" class="text-center py-10 font-bold text-slate-400"><i class="fa-solid fa-circle-notch fa-spin mr-2 text-blue-500"></i> Carregando...</td></tr>
-        </tbody>
-      </table>
+  <!-- KANBAN BOARD -->
+  <div class="flex-1 overflow-x-auto overflow-y-hidden custom-scrollbar pb-2">
+    <div class="flex gap-5 h-full items-start" id="kanban-board">
+        
+        <!-- COLUNA 1: PRODUÇÃO -->
+        <div class="kanban-col">
+            <div class="kanban-header bg-slate-100/50">
+                <div class="flex justify-between items-center mb-1">
+                    <h3 class="font-black text-slate-700 text-xs uppercase tracking-widest"><i class="fa-solid fa-industry text-slate-500 mr-1"></i> Envasando (Prod)</h3>
+                    <span id="count-prod" class="bg-slate-200 text-slate-600 text-[10px] font-black px-2 py-0.5 rounded-full">0</span>
+                </div>
+                <p class="text-[9px] font-bold text-slate-400 uppercase">Na Linha ou Auditoria</p>
+            </div>
+            <div class="kanban-body custom-scrollbar" id="col-producao"></div>
+        </div>
+
+        <!-- COLUNA 2: AGUARDANDO OP -->
+        <div class="kanban-col">
+            <div class="kanban-header bg-amber-50/50 border-b-amber-200">
+                <div class="flex justify-between items-center mb-1">
+                    <h3 class="font-black text-amber-700 text-xs uppercase tracking-widest"><i class="fa-solid fa-file-signature text-amber-500 mr-1"></i> Aguardando O.P.</h3>
+                    <span id="count-wait" class="bg-amber-200 text-amber-800 text-[10px] font-black px-2 py-0.5 rounded-full">0</span>
+                </div>
+                <p class="text-[9px] font-bold text-amber-600/70 uppercase">Recebidos fisicamente</p>
+            </div>
+            <div class="kanban-body custom-scrollbar" id="col-aguardando"></div>
+        </div>
+
+        <!-- COLUNA 3: EM ANÁLISE -->
+        <div class="kanban-col">
+            <div class="kanban-header bg-blue-50/50 border-b-blue-200">
+                <div class="flex justify-between items-center mb-1">
+                    <h3 class="font-black text-blue-700 text-xs uppercase tracking-widest"><i class="fa-solid fa-vial-circle-check text-blue-500 mr-1"></i> Em Análise (Quali)</h3>
+                    <span id="count-analise" class="bg-blue-200 text-blue-800 text-[10px] font-black px-2 py-0.5 rounded-full">0</span>
+                </div>
+                <p class="text-[9px] font-bold text-blue-600/70 uppercase">OPs assinadas / Aguard. Laudo</p>
+            </div>
+            <div class="kanban-body custom-scrollbar" id="col-analise"></div>
+        </div>
+
+        <!-- COLUNA 4: RETIDOS / BLOQUEADOS -->
+        <div class="kanban-col">
+            <div class="kanban-header bg-red-50/50 border-b-red-200">
+                <div class="flex justify-between items-center mb-1">
+                    <h3 class="font-black text-red-700 text-xs uppercase tracking-widest"><i class="fa-solid fa-ban text-red-500 mr-1"></i> Retidos / Bloqueados</h3>
+                    <span id="count-block" class="bg-red-200 text-red-800 text-[10px] font-black px-2 py-0.5 rounded-full">0</span>
+                </div>
+                <p class="text-[9px] font-bold text-red-600/70 uppercase">Impedidos de faturamento</p>
+            </div>
+            <div class="kanban-body custom-scrollbar" id="col-retidos"></div>
+        </div>
+
+        <!-- COLUNA 5: LIBERADOS HOJE -->
+        <div class="kanban-col">
+            <div class="kanban-header bg-emerald-50/50 border-b-emerald-200">
+                <div class="flex justify-between items-center mb-1">
+                    <h3 class="font-black text-emerald-700 text-xs uppercase tracking-widest"><i class="fa-solid fa-truck-fast text-emerald-500 mr-1"></i> Liberados (Hoje)</h3>
+                    <span id="count-lib" class="bg-emerald-200 text-emerald-800 text-[10px] font-black px-2 py-0.5 rounded-full">0</span>
+                </div>
+                <p class="text-[9px] font-bold text-emerald-600/70 uppercase">Livres para carregamento</p>
+            </div>
+            <div class="kanban-body custom-scrollbar" id="col-liberados"></div>
+        </div>
+
     </div>
   </div>
 
   <script>
     const client = window.supabase.createClient('https://cbrwmscaidyeaamyfiyt.supabase.co', 'sb_publishable_neiGbVa2X1nBfX5wT3UGYw_3RWe43_G');
-    
-    document.getElementById('filtroDataCtrl').value = new Date().toISOString().split('T')[0];
-    carregarDadosControladoria();
+    let mapDescricoes = {};
 
-    async function carregarDadosControladoria() {
-      const dataSelecionada = document.getElementById('filtroDataCtrl').value;
-      const tbody = document.getElementById('corpoTabelaControladoria');
-      tbody.innerHTML = `<tr><td colspan="6" class="text-center py-10 font-bold text-slate-400"><i class="fa-solid fa-circle-notch fa-spin mr-2 text-blue-500"></i> Buscando...</td></tr>`;
-      
-      const { data: invData } = await client.from('inventario_pa').select('n_item, lote, qtd_fisica, produtos_moove(descricao)').eq('data_inventario', dataSelecionada);
+    window.onload = () => carregarKanban();
 
-      if (!invData || invData.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-16 font-bold text-slate-400">Nenhum lote consolidado para este dia.</td></tr>`;
-        return;
-      }
+    async function buscarRastreioLote() {
+        const lote = document.getElementById('inputRastreioLote').value.trim().toUpperCase();
+        if(!lote) return Swal.fire('Atenção', 'Digite um número de lote para rastrear.', 'warning');
 
-      let agrupado = {};
-      invData.forEach(row => {
-        let chave = `${row.n_item}_${row.lote}`;
-        if (!agrupado[chave]) agrupado[chave] = { nItem: row.n_item, desc: row.produtos_moove ? row.produtos_moove.descricao : 'N/A', lote: row.lote, qtdTotal: 0, dataOp: "", statusExpedicao: "AGUARDANDO" };
-        agrupado[chave].qtdTotal += parseFloat(row.qtd_fisica);
-      });
+        Swal.fire({ title: 'Buscando Rastreio...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
 
-      const { data: ctrlData } = await client.from('controle_op').select('*');
-      let mapaCtrl = {};
-      if (ctrlData) ctrlData.forEach(c => { mapaCtrl[`${c.n_item}_${c.lote}`] = c; });
+        // 1. Busca Planos (Pega o mais recente atrelado ao lote)
+        const { data: planos, error: errPlanos } = await client.from('wms_planos_producao')
+            .select('*').eq('lote', lote).order('created_at', {ascending: false});
 
-      let dados = [];
-      for (let chave in agrupado) {
-        let item = agrupado[chave];
-        if (mapaCtrl[chave]) {
-          let info = mapaCtrl[chave];
-          if (info.data_op) item.dataOp = new Date(info.data_op).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
-          item.statusExpedicao = info.status_expedicao || "AGUARDANDO";
+        if (errPlanos || !planos || planos.length === 0) {
+            return Swal.fire('Não Encontrado', `O lote <b>${lote}</b> não possui histórico de produção sistêmica registrado.`, 'info');
         }
-        dados.push(item);
-      }
 
-      let html = '';
-      dados.forEach(d => {
-        let boxOP = (!d.dataOp || d.dataOp === "") 
-          ? `<button onclick="confirmarOP('${d.nItem}', '${d.lote}')" class="w-full bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-700 border-2 border-slate-200 px-3 py-2 rounded-xl text-xs font-black transition-all flex justify-center items-center gap-2"><i class="fa-solid fa-check-circle"></i> Confirmar OP</button>` 
-          : `<div class="bg-green-50 border border-green-200 text-green-700 px-3 py-2 rounded-xl text-xs font-black flex items-center justify-center gap-2"><i class="fa-solid fa-file-circle-check"></i> ${d.dataOp}</div>`;
-
-        let disabledAttr = (!d.dataOp || d.dataOp === "") ? "disabled" : "";
-        let opacidade = (!d.dataOp || d.dataOp === "") ? "opacity-50 cursor-not-allowed" : "cursor-pointer";
+        const p = planos[0]; // Plano ativo/mais recente
         
-        let corSelect = "bg-slate-100 border-slate-200 text-slate-600";
-        if (d.statusExpedicao === "LIBERADO") corSelect = "bg-blue-50 border-blue-300 text-blue-700";
-        if (d.statusExpedicao === "BLOQUEADO" || d.statusExpedicao === "NÃO") corSelect = "bg-red-50 border-red-300 text-red-700";
+        // 2. Busca Produto
+        const { data: prods } = await client.from('produtos_moove').select('*').eq('n_item', p.n_item).single();
+        const desc = prods ? prods.descricao : 'S/ DESCRIÇÃO';
 
-        html += `
-          <tr class="hover:bg-slate-50 border-b border-slate-100">
-            <td class="p-4"><span class="bg-white px-2 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-600">${d.nItem}</span></td>
-            <td class="p-4 text-xs font-bold text-slate-600 truncate max-w-[200px]" title="${d.desc}">${d.desc}</td>
-            <td class="p-4 text-center font-black text-slate-800 text-xs">${d.lote}</td>
-            <td class="p-4 text-center font-black text-[#0055A5]">${d.qtdTotal.toLocaleString('pt-BR')}</td>
-            <td class="p-4 text-center border-l border-slate-100 px-6">${boxOP}</td>
-            <td class="p-4 text-center px-6">
-              <select onchange="alterarExpedicao('${d.nItem}', '${d.lote}', this.value)" class="w-full font-black text-xs px-3 py-2 rounded-xl border-2 outline-none transition-colors ${corSelect} ${opacidade}" ${disabledAttr} style="appearance: none; text-align-last: center;">
-                <option value="AGUARDANDO" ${d.statusExpedicao === 'AGUARDANDO' ? 'selected' : ''}>Aguardando</option>
-                <option value="LIBERADO" ${d.statusExpedicao === 'LIBERADO' ? 'selected' : ''}>Liberar P/ Expedição</option>
-                <option value="BLOQUEADO" ${d.statusExpedicao === 'BLOQUEADO' || d.statusExpedicao === 'NÃO' ? 'selected' : ''}>Bloqueado</option>
-              </select>
-            </td>
-          </tr>
+        // 3. Busca OP Controladoria
+        const { data: ops } = await client.from('controle_op').select('*').eq('n_item', p.n_item).eq('lote', lote).single();
+
+        // 4. Busca Puxada Logística
+        const { data: paletes } = await client.from('wms_paletes').select('qtd').eq('plano_id', p.id);
+        let puxado = 0;
+        if(paletes) { puxado = paletes.reduce((acc, pl) => acc + Number(pl.qtd), 0); }
+
+        // Formatador de Datas
+        const formatDt = (isoStr) => {
+            if(!isoStr) return '';
+            return new Date(isoStr).toLocaleString('pt-BR', {dateStyle:'short', timeStyle:'short'});
+        };
+
+        // Construção da Timeline HTML
+        // NÓ 1: Produção
+        let step1 = `
+        <div class="relative pl-6 pb-6">
+            <div class="absolute -left-[9px] top-0.5 w-5 h-5 rounded-full bg-indigo-500 border-[4px] border-white shadow-sm"></div>
+            <div class="absolute left-1 top-5 bottom-0 w-0.5 bg-slate-200"></div>
+            <h4 class="text-xs font-black text-slate-800 uppercase tracking-widest leading-none">Início da Produção</h4>
+            <p class="text-[10px] font-bold text-slate-500 mt-1.5"><i class="fa-regular fa-clock mr-1"></i> ${formatDt(p.created_at)}</p>
+            <p class="text-[10px] font-bold text-slate-500 mt-0.5"><i class="fa-regular fa-user mr-1"></i> Abertura: <span class="text-indigo-600">${p.criado_por || 'Sistema'}</span></p>
+        </div>`;
+
+        // NÓ 2: Logística
+        let corLog = p.closed_at ? 'bg-blue-500' : 'bg-slate-300';
+        let txtLog = p.closed_at ? formatDt(p.closed_at) : 'Em Andamento...';
+        let step2 = `
+        <div class="relative pl-6 pb-6">
+            <div class="absolute -left-[9px] top-0.5 w-5 h-5 rounded-full ${corLog} border-[4px] border-white shadow-sm z-10"></div>
+            <div class="absolute left-1 top-5 bottom-0 w-0.5 bg-slate-200"></div>
+            <h4 class="text-xs font-black text-slate-800 uppercase tracking-widest leading-none">Encerramento Lote (FUP)</h4>
+            <p class="text-[10px] font-bold text-slate-500 mt-1.5"><i class="fa-regular fa-clock mr-1"></i> ${txtLog}</p>
+            ${p.closed_at ? `<p class="text-[10px] font-bold text-slate-500 mt-0.5"><i class="fa-regular fa-user mr-1"></i> Fechamento: <span class="text-blue-600">${p.fechado_por || 'Logística'}</span></p>` : ''}
+            <p class="text-[10px] font-bold text-slate-500 mt-0.5"><i class="fa-solid fa-cubes-stacked mr-1"></i> Recebido: <span class="text-slate-800 font-black">${puxado} UN</span></p>
+        </div>`;
+
+        // NÓ 3: Controladoria OP
+        let hasOp = ops && ops.data_op;
+        let corOp = hasOp ? 'bg-amber-500' : 'bg-slate-300';
+        let txtOp = hasOp ? formatDt(ops.data_op) : 'Aguardando Assinatura';
+        let step3 = `
+        <div class="relative pl-6 pb-6">
+            <div class="absolute -left-[9px] top-0.5 w-5 h-5 rounded-full ${corOp} border-[4px] border-white shadow-sm z-10"></div>
+            <div class="absolute left-1 top-5 bottom-0 w-0.5 bg-slate-200"></div>
+            <h4 class="text-xs font-black text-slate-800 uppercase tracking-widest leading-none">Entrada Sistêmica (O.P.)</h4>
+            <p class="text-[10px] font-bold text-slate-500 mt-1.5"><i class="fa-regular fa-clock mr-1"></i> ${txtOp}</p>
+        </div>`;
+
+        // NÓ 4: Qualidade
+        let statusExp = ops ? ops.status_expedicao : 'AGUARDANDO';
+        let corQuali = 'bg-slate-300';
+        let iconeQuali = '';
+        let attQuali = ops && ops.data_atualizacao ? formatDt(ops.data_atualizacao) : 'Aguardando Avaliação';
+
+        if(statusExp === 'LIBERADO') { corQuali = 'bg-emerald-500'; iconeQuali = '<i class="fa-solid fa-check text-emerald-500 ml-1"></i>'; }
+        if(statusExp === 'BLOQUEADO' || statusExp === 'NÃO') { corQuali = 'bg-red-500'; iconeQuali = '<i class="fa-solid fa-ban text-red-500 ml-1"></i>'; }
+
+        let step4 = `
+        <div class="relative pl-6">
+            <div class="absolute -left-[9px] top-0.5 w-5 h-5 rounded-full ${corQuali} border-[4px] border-white shadow-sm z-10"></div>
+            <h4 class="text-xs font-black text-slate-800 uppercase tracking-widest leading-none">Veredito Qualidade</h4>
+            <p class="text-[10px] font-bold text-slate-500 mt-1.5"><i class="fa-regular fa-clock mr-1"></i> ${attQuali}</p>
+            <p class="text-[11px] font-black text-slate-700 mt-1 uppercase tracking-widest">Status: ${statusExp} ${iconeQuali}</p>
+        </div>`;
+
+        let modalHTML = `
+        <div class="text-left">
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-5 shadow-sm">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="bg-white border border-slate-200 text-slate-700 text-xs font-black px-2 py-0.5 rounded tracking-widest">${p.n_item}</span>
+                    <span class="bg-blue-100 text-blue-700 border border-blue-200 text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-widest">Lote: ${lote}</span>
+                </div>
+                <p class="text-xs font-bold text-slate-600">${desc}</p>
+            </div>
+            
+            <div class="ml-4 mt-2">
+                ${step1}
+                ${step2}
+                ${step3}
+                ${step4}
+            </div>
+        </div>
         `;
-      });
-      tbody.innerHTML = html;
+
+        Swal.fire({
+            title: `<div class="text-left font-black text-xl text-slate-800 uppercase tracking-tight border-b border-slate-100 pb-3 mb-2"><i class="fa-solid fa-clock-rotate-left text-[#001A70] mr-2"></i> Rastreio Operacional</div>`,
+            html: modalHTML,
+            width: '600px',
+            showConfirmButton: false,
+            showCloseButton: true,
+            customClass: { popup: 'swal-desktop-modal' }
+        });
+        
+        document.getElementById('inputRastreioLote').value = '';
     }
 
-    async function confirmarOP(nItem, lote) {
-      const { isConfirmed } = await Swal.fire({ title: 'Confirmar Entrada de O.P.', html: `Deseja dar o <b>OK de Recebimento</b> para o lote <br><span class="text-blue-600 font-black text-lg">${lote}</span>?`, icon: 'question', showCancelButton: true, confirmButtonColor: '#001A70', confirmButtonText: 'Confirmar', cancelButtonText: 'Cancelar' });
+    async function carregarKanban() {
+      Swal.fire({ title: 'Mapeando Lotes...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+      
+      const hojeIso = new Date().toISOString().split('T')[0];
+
+      try {
+        const { data: prods } = await client.from('produtos_moove').select('n_item, descricao');
+        if(prods) prods.forEach(p => mapDescricoes[p.n_item] = p.descricao);
+
+        const { data: planos } = await client.from('wms_planos_producao').select('*').in('status', ['EM ANDAMENTO', 'AGUARDANDO FECHAMENTO']);
+        
+        const { data: inv } = await client.from('inventario_pa').select('*');
+        
+        const { data: ops } = await client.from('controle_op').select('*');
+        let mapOp = {};
+        if (ops) ops.forEach(o => { mapOp[`${o.n_item.trim().toUpperCase()}_${o.lote.trim().toUpperCase()}`] = o; });
+
+        let htmlProd = '', htmlWait = '', htmlAnalise = '', htmlBlock = '', htmlLib = '';
+        let cProd = 0, cWait = 0, cAnalise = 0, cBlock = 0, cLib = 0;
+
+        if (planos) {
+            planos.forEach(p => {
+                let desc = mapDescricoes[p.n_item] || 'S/ DESCRIÇÃO';
+                let qtd = p.qtd_declarada_fim || p.qtd_planejada || 0;
+                let badgeFab = p.status === 'AGUARDANDO FECHAMENTO' ? '<span class="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded text-[9px] uppercase font-black">Em Auditoria</span>' : '<span class="bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded text-[9px] uppercase font-black">Na Linha</span>';
+                
+                htmlProd += `
+                <div class="k-card prod">
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="font-black text-slate-800 text-sm bg-slate-100 px-2 py-0.5 rounded">${p.n_item}</span>
+                        ${badgeFab}
+                    </div>
+                    <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">LOTE: <span class="text-blue-600 font-black">${p.lote}</span></p>
+                    <p class="text-xs font-bold text-slate-600 leading-tight mb-3 line-clamp-2" title="${desc}">${desc}</p>
+                    <div class="pt-2 border-t border-slate-100 flex justify-between items-end">
+                        <div>
+                            <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Estimativa</p>
+                            <p class="font-black text-slate-700 text-sm">${qtd} UN</p>
+                        </div>
+                    </div>
+                </div>`;
+                cProd++;
+            });
+        }
+
+        let mapEstoque = {};
+        if (inv) {
+            inv.forEach(i => {
+                let chave = `${i.n_item.trim().toUpperCase()}_${i.lote.trim().toUpperCase()}`;
+                if(!mapEstoque[chave]) mapEstoque[chave] = { n_item: i.n_item, lote: i.lote, qtd: 0 };
+                mapEstoque[chave].qtd += parseFloat(i.qtd_fisica) || 0;
+            });
+        }
+
+        for (let chave in mapEstoque) {
+            let itemFisico = mapEstoque[chave];
+            if (itemFisico.qtd <= 0) continue; 
+
+            let desc = mapDescricoes[itemFisico.n_item] || 'S/ DESCRIÇÃO';
+            let ctrl = mapOp[chave];
+
+            if (!ctrl) {
+                htmlWait += `
+                <div class="k-card wait">
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="font-black text-slate-800 text-sm bg-slate-100 px-2 py-0.5 rounded border border-slate-200">${itemFisico.n_item}</span>
+                        <span class="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded text-[9px] uppercase font-black tracking-widest"><i class="fa-solid fa-clock"></i> Pendente</span>
+                    </div>
+                    <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">LOTE: <span class="text-blue-600 font-black">${itemFisico.lote}</span></p>
+                    <p class="text-xs font-bold text-slate-600 leading-tight mb-3 line-clamp-2" title="${desc}">${desc}</p>
+                    <div class="pt-2 border-t border-slate-100 flex justify-between items-center mt-2">
+                        <div>
+                            <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Saldo Físico</p>
+                            <p class="font-black text-slate-700 text-sm">${itemFisico.qtd.toLocaleString('pt-BR')} UN</p>
+                        </div>
+                        <button onclick="assinarOP('${itemFisico.n_item}', '${itemFisico.lote}')" class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-black shadow-sm uppercase active:scale-95 transition-transform"><i class="fa-solid fa-signature"></i> Assinar OP</button>
+                    </div>
+                </div>`;
+                cWait++;
+            } 
+            else {
+                let dtOp = new Date(ctrl.data_op).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+
+                if (ctrl.status_expedicao === 'AGUARDANDO') {
+                    htmlAnalise += `
+                    <div class="k-card analise">
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="font-black text-slate-800 text-sm bg-slate-100 px-2 py-0.5 rounded border border-slate-200">${itemFisico.n_item}</span>
+                            <span class="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded text-[9px] uppercase font-black tracking-widest">OP: ${dtOp}</span>
+                        </div>
+                        <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">LOTE: <span class="text-blue-600 font-black">${itemFisico.lote}</span></p>
+                        <p class="text-xs font-bold text-slate-600 leading-tight mb-3 line-clamp-2" title="${desc}">${desc}</p>
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="text-xs font-black text-slate-700 bg-slate-100 px-2 py-1 rounded">${itemFisico.qtd.toLocaleString('pt-BR')} UN</span>
+                        </div>
+                        <div class="pt-3 border-t border-slate-100 flex gap-2">
+                            <button onclick="mudarStatusOP('${itemFisico.n_item}', '${itemFisico.lote}', 'LIBERADO')" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-1.5 rounded-lg text-[10px] font-black shadow-sm uppercase transition-colors"><i class="fa-solid fa-check"></i> Aprovar</button>
+                            <button onclick="mudarStatusOP('${itemFisico.n_item}', '${itemFisico.lote}', 'BLOQUEADO')" class="flex-1 bg-red-500 hover:bg-red-600 text-white py-1.5 rounded-lg text-[10px] font-black shadow-sm uppercase transition-colors"><i class="fa-solid fa-ban"></i> Reter</button>
+                        </div>
+                    </div>`;
+                    cAnalise++;
+                }
+                else if (ctrl.status_expedicao === 'BLOQUEADO' || ctrl.status_expedicao === 'NÃO') {
+                    htmlBlock += `
+                    <div class="k-card block">
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="font-black text-slate-800 text-sm bg-slate-100 px-2 py-0.5 rounded border border-slate-200">${itemFisico.n_item}</span>
+                            <span class="bg-red-100 text-red-700 px-1.5 py-0.5 rounded text-[9px] uppercase font-black tracking-widest"><i class="fa-solid fa-triangle-exclamation"></i> Retido</span>
+                        </div>
+                        <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">LOTE: <span class="text-blue-600 font-black">${itemFisico.lote}</span></p>
+                        <p class="text-xs font-bold text-slate-600 leading-tight mb-3 line-clamp-2" title="${desc}">${desc}</p>
+                        <div class="pt-2 border-t border-slate-100 flex justify-between items-center mt-2">
+                            <span class="font-black text-slate-700 text-sm">${itemFisico.qtd.toLocaleString('pt-BR')} UN</span>
+                            <button onclick="mudarStatusOP('${itemFisico.n_item}', '${itemFisico.lote}', 'LIBERADO')" class="bg-white border border-slate-200 hover:border-emerald-500 hover:text-emerald-600 text-slate-500 px-3 py-1.5 rounded-lg text-[10px] font-black shadow-sm uppercase transition-colors"><i class="fa-solid fa-unlock"></i> Liberar</button>
+                        </div>
+                    </div>`;
+                    cBlock++;
+                }
+                else if (ctrl.status_expedicao === 'LIBERADO') {
+                    let dtUltimaAtt = new Date(ctrl.data_atualizacao).toISOString().split('T')[0];
+                    if (dtUltimaAtt === hojeIso) {
+                        let dtApprov = new Date(ctrl.data_atualizacao).toLocaleTimeString('pt-BR', { hour: '2-digit', minute:'2-digit' });
+                        htmlLib += `
+                        <div class="k-card lib opacity-80 hover:opacity-100">
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="font-black text-slate-600 text-sm bg-slate-100 px-2 py-0.5 rounded border border-slate-200">${itemFisico.n_item}</span>
+                                <span class="bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded text-[9px] uppercase font-black tracking-widest"><i class="fa-solid fa-check-double"></i> Lib às ${dtApprov}</span>
+                            </div>
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">LOTE: <span class="text-slate-600 font-black">${itemFisico.lote}</span></p>
+                            <p class="text-xs font-bold text-slate-500 leading-tight mb-2 line-clamp-1" title="${desc}">${desc}</p>
+                            <p class="font-black text-slate-400 text-xs">${itemFisico.qtd.toLocaleString('pt-BR')} UN</p>
+                        </div>`;
+                        cLib++;
+                    }
+                }
+            }
+        }
+
+        document.getElementById('col-producao').innerHTML = htmlProd || '<p class="text-center text-slate-400 text-xs font-bold py-6">Nenhum lote na linha.</p>';
+        document.getElementById('count-prod').innerText = cProd;
+
+        document.getElementById('col-aguardando').innerHTML = htmlWait || '<p class="text-center text-amber-500/50 text-xs font-bold py-6">Fila vazia.</p>';
+        document.getElementById('count-wait').innerText = cWait;
+
+        document.getElementById('col-analise').innerHTML = htmlAnalise || '<p class="text-center text-blue-400/50 text-xs font-bold py-6">Fila vazia.</p>';
+        document.getElementById('count-analise').innerText = cAnalise;
+
+        document.getElementById('col-retidos').innerHTML = htmlBlock || '<p class="text-center text-red-400/50 text-xs font-bold py-6">Nenhum bloqueio.</p>';
+        document.getElementById('count-block').innerText = cBlock;
+
+        document.getElementById('col-liberados').innerHTML = htmlLib || '<p class="text-center text-emerald-500/50 text-xs font-bold py-6">Nenhuma liberação hoje.</p>';
+        document.getElementById('count-lib').innerText = cLib;
+
+        Swal.close();
+      } catch (err) { Swal.fire('Erro', err.message, 'error'); }
+    }
+
+    async function assinarOP(nItem, lote) {
+      const { isConfirmed } = await Swal.fire({ 
+          title: 'Assinar O.P. de Entrada', 
+          html: `Deseja dar o <b>OK de Recebimento</b> para o lote <br><span class="text-amber-600 font-black text-lg">${lote}</span>?`, 
+          icon: 'question', showCancelButton: true, confirmButtonColor: '#f59e0b', confirmButtonText: 'Assinar OP', cancelButtonText: 'Cancelar' 
+      });
+      
       if (isConfirmed) {
-        Swal.fire({ title: 'Gravando...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); }});
+        Swal.fire({ title: 'Avançando lote...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); }});
         const agora = new Date().toISOString();
         await client.from('controle_op').upsert({ n_item: nItem, lote: lote, data_op: agora, status_expedicao: 'AGUARDANDO', data_atualizacao: agora }, { onConflict: 'n_item,lote' });
-        Swal.fire({ title: 'Salvo!', icon: 'success', timer: 1200, showConfirmButton: false });
-        carregarDadosControladoria();
+        
+        setTimeout(() => { carregarKanban(); Swal.close(); }, 500);
       }
     }
 
-    async function alterarExpedicao(nItem, lote, novoStatus) {
-      if(novoStatus === "AGUARDANDO") return;
-      Swal.fire({ title: 'Gravando...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); }});
-      await client.from('controle_op').update({ status_expedicao: novoStatus, data_atualizacao: new Date().toISOString() }).eq('n_item', nItem).eq('lote', lote);
-      Swal.fire({ title: 'Salvo!', icon: 'success', timer: 1200, showConfirmButton: false });
-      carregarDadosControladoria();
+    async function mudarStatusOP(nItem, lote, novoStatus) {
+      let iconStr = novoStatus === 'LIBERADO' ? 'success' : 'warning';
+      let titleStr = novoStatus === 'LIBERADO' ? 'Aprovar Lote' : 'Reter Lote';
+      let colorStr = novoStatus === 'LIBERADO' ? '#10b981' : '#ef4444';
+      
+      const { isConfirmed } = await Swal.fire({ 
+          title: titleStr, 
+          html: `Confirmar novo status para o lote <b>${lote}</b>?`, 
+          icon: iconStr, showCancelButton: true, confirmButtonColor: colorStr, confirmButtonText: 'Sim, Confirmar', cancelButtonText: 'Cancelar' 
+      });
+
+      if (isConfirmed) {
+        Swal.fire({ title: 'Movendo lote...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); }});
+        await client.from('controle_op').update({ status_expedicao: novoStatus, data_atualizacao: new Date().toISOString() }).eq('n_item', nItem).eq('lote', lote);
+        setTimeout(() => { carregarKanban(); Swal.close(); }, 500);
+      }
     }
   </script>
 </body>

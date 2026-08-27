@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FLOW WMS | Gestão de Usuários</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; padding: 2rem; }
+    .card-modern { background: white; border-radius: 1.25rem; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+    .input-modern { width: 100%; background-color: #f8fafc; border: 2px solid #e2e8f0; color: #1e293b; font-weight: 700; border-radius: 0.75rem; padding: 0.75rem 1rem; outline: none; transition: all 0.2s; font-size: 0.875rem; }
+    .input-modern:focus { background-color: #ffffff; border-color: #3b82f6; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+  </style>
+</head>
+<body class="flex flex-col h-[90vh]">
+
+  <div class="max-w-[1200px] w-full mx-auto flex flex-col lg:flex-row gap-6 h-full">
+    
+    <!-- LADO ESQUERDO: FORMULÁRIO -->
+    <div class="w-full lg:w-1/3 card-modern p-6 flex flex-col h-full border-t-4 border-t-blue-600">
+      <div class="flex items-center justify-between mb-6 border-b border-slate-100 pb-4">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center text-lg shadow-sm"><i class="fa-solid fa-user-shield"></i></div>
+          <h2 class="text-xl font-black text-slate-800 uppercase tracking-tight" id="formTitulo">Novo Usuário</h2>
+        </div>
+        <button id="btnCancelarEdit" onclick="cancelarEdicao()" class="hidden bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors">Cancelar</button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-5">
+        <input type="hidden" id="editId" value="">
+
+        <div>
+            <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Nome Completo <span class="text-red-500">*</span></label>
+            <input type="text" id="nome" onblur="gerarLoginAuto()" class="input-modern uppercase" placeholder="Nome do colaborador">
+        </div>
+        
+        <div>
+            <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Login Gerado (Automático) <span class="text-red-500">*</span></label>
+            <input type="text" id="login" class="input-modern lowercase bg-slate-200 cursor-not-allowed text-slate-500 focus:border-e2e8f0 focus:shadow-none border-slate-300" readonly placeholder="Aguardando nome...">
+            <p class="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-widest">O login não pode ser alterado.</p>
+        </div>
+
+        <div>
+            <label class="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Perfil de Acesso <span class="text-red-500">*</span></label>
+            <select id="perfil_acesso" class="input-modern cursor-pointer border-blue-200 bg-blue-50/50 focus:border-blue-500">
+                <option value="OPERADOR">OPERADOR (PDA/Coletor)</option>
+                <option value="CONFERENTE">CONFERENTE (PDA/Doca)</option>
+                <option value="LOGISTICA">LOGÍSTICA (Gestão/Torre)</option>
+                <option value="PRODUCAO">PRODUÇÃO (Apontamento)</option>
+                <option value="CONTROLADORIA">CONTROLADORIA (Qualidade)</option>
+                <option value="TRANSPORTE">TRANSPORTE (Portaria)</option>
+                <option value="DESENVOLVEDOR">DESENVOLVEDOR (Admin/TI)</option>
+            </select>
+        </div>
+
+        <div id="avisoSenha" class="bg-amber-50 border border-amber-200 p-3 rounded-xl flex items-start gap-3">
+            <i class="fa-solid fa-lock text-amber-500 mt-0.5"></i>
+            <div>
+                <p class="text-xs font-black text-amber-700 uppercase tracking-wider mb-0.5">Senha Padrão: 1234</p>
+                <p class="text-[10px] font-bold text-amber-600 leading-tight">No primeiro acesso, o sistema obrigará o usuário a criar uma senha forte alfanumérica.</p>
+            </div>
+        </div>
+      </div>
+
+      <div class="pt-4 border-t border-slate-100 mt-2 shrink-0">
+        <button onclick="salvarUsuario()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-3.5 rounded-xl shadow-md transition-transform active:scale-95 flex items-center justify-center gap-2 uppercase tracking-wide text-sm">
+            <i class="fa-solid fa-user-check"></i> Salvar Usuário
+        </button>
+      </div>
+    </div>
+
+    <!-- LADO DIREITO: LISTAGEM -->
+    <div class="w-full lg:w-2/3 card-modern p-6 flex flex-col h-full">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 border-b border-slate-100 pb-4">
+        <h2 class="text-xl font-black text-slate-800 uppercase tracking-tight">Equipe Cadastrada</h2>
+        <div class="relative w-full sm:w-64">
+            <input type="text" id="buscaListagem" onkeyup="buscarLista()" placeholder="Buscar nome ou login..." class="w-full bg-slate-50 border border-slate-200 text-sm font-bold rounded-xl pl-10 pr-4 py-2 outline-none focus:border-blue-500 transition-colors">
+            <i class="fa-solid fa-search absolute left-3.5 top-3 text-slate-400"></i>
+        </div>
+      </div>
+
+      <div class="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3" id="listaUsuarios">
+        <div class="text-center text-slate-400 py-10 font-bold"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Carregando usuários...</div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const client = window.supabase.createClient('https://cbrwmscaidyeaamyfiyt.supabase.co', 'sb_publishable_neiGbVa2X1nBfX5wT3UGYw_3RWe43_G');
+    let listaGlobal = [];
+
+    window.onload = () => carregarTabela();
+
+    async function gerarLoginAuto() {
+        const isEdit = document.getElementById('editId').value;
+        if (isEdit) return; // Em edição não altera login
+
+        const nomeInput = document.getElementById('nome').value.trim();
+        if (!nomeInput) {
+            document.getElementById('login').value = "";
+            return;
+        }
+
+        document.getElementById('login').value = "Processando...";
+
+        // Tratamento: Tira acentos, caracteres especiais, deixa minúsculo e separa
+        let nomeLimpo = nomeInput.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z\s]/g, "");
+        let palavras = nomeLimpo.split(' ').filter(p => !['de', 'da', 'do', 'dos', 'das'].includes(p) && p.length > 0);
+
+        if (palavras.length === 0) return document.getElementById('login').value = "";
+
+        let baseLogin = "";
+        if (palavras.length === 1) {
+            baseLogin = palavras[0];
+        } else {
+            baseLogin = palavras[0] + "." + palavras[palavras.length - 1]; // Primeiro.Ultimo
+        }
+
+        // Verifica na base se o login já existe para adicionar numeração
+        const { data } = await client.from('usuarios').select('login').ilike('login', `${baseLogin}%`);
+        let finalLogin = baseLogin;
+
+        if (data && data.length > 0) {
+            let sufixo = 1;
+            while (data.find(u => u.login === finalLogin)) {
+                finalLogin = `${baseLogin}${sufixo}`;
+                sufixo++;
+            }
+        }
+
+        document.getElementById('login').value = finalLogin;
+    }
+
+    async function carregarTabela() {
+        const tb = document.getElementById('listaUsuarios');
+        tb.innerHTML = '<div class="text-center text-slate-400 py-10 font-bold"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Atualizando...</div>';
+        
+        const { data, error } = await client.from('usuarios').select('*').order('nome', { ascending: true });
+        
+        if (error) {
+            tb.innerHTML = '<div class="text-center text-red-500 py-10 font-bold">Erro ao carregar a equipe.</div>';
+            return;
+        }
+        
+        listaGlobal = data || [];
+        renderizarLista(listaGlobal);
+    }
+
+    function renderizarLista(dados) {
+        const tb = document.getElementById('listaUsuarios');
+        if (dados.length === 0) {
+            tb.innerHTML = '<div class="text-center text-slate-400 py-10 font-bold border-2 border-dashed border-slate-200 rounded-xl">Nenhum usuário encontrado.</div>';
+            return;
+        }
+
+        let html = '';
+        dados.forEach(u => {
+            let corBadge = "bg-slate-100 text-slate-600 border-slate-200";
+            if(u.perfil_acesso === 'DESENVOLVEDOR' || u.perfil_acesso === 'LOGISTICA') corBadge = "bg-indigo-100 text-indigo-700 border-indigo-200";
+            if(u.perfil_acesso === 'PRODUCAO') corBadge = "bg-blue-100 text-blue-700 border-blue-200";
+            if(u.perfil_acesso === 'CONTROLADORIA') corBadge = "bg-emerald-100 text-emerald-700 border-emerald-200";
+            if(u.perfil_acesso === 'CONFERENTE' || u.perfil_acesso === 'OPERADOR') corBadge = "bg-amber-100 text-amber-700 border-amber-200";
+
+            let iconSenhaStatus = u.senha === '1234' 
+                ? '<i class="fa-solid fa-triangle-exclamation text-amber-500 mr-1" title="Senha Padrão"></i>' 
+                : '<i class="fa-solid fa-shield-halved text-emerald-500 mr-1" title="Senha Segura Criada"></i>';
+
+            html += `
+            <div class="bg-white border border-slate-200 rounded-xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:shadow-md hover:border-blue-300 transition-all group">
+                <div class="flex items-center gap-4">
+                    <div class="w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center font-black border border-slate-200">
+                        ${u.nome.substring(0,2).toUpperCase()}
+                    </div>
+                    <div>
+                        <h3 class="font-black text-slate-800 text-sm leading-tight uppercase truncate max-w-[250px]">${u.nome}</h3>
+                        <div class="flex items-center gap-2 mt-1.5">
+                            <span class="text-[10px] font-bold text-slate-500"><i class="fa-solid fa-user-lock mr-1"></i> ${u.login}</span>
+                            <span class="text-[10px] font-bold text-slate-300">|</span>
+                            <span class="text-[10px] font-bold text-slate-500">${iconSenhaStatus} Senha</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center justify-end gap-2 w-full sm:w-auto mt-2 sm:mt-0">
+                    <span class="text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded border ${corBadge} mr-2 hidden md:block">${u.perfil_acesso}</span>
+                    
+                    <button onclick='editarUsuario(${JSON.stringify(u)})' class="bg-slate-50 border border-slate-200 hover:bg-blue-50 hover:text-blue-600 text-slate-500 px-3 py-2 rounded-lg text-xs font-bold transition-colors shadow-sm" title="Editar Nome/Perfil"><i class="fa-solid fa-pen"></i></button>
+                    
+                    <button onclick='resetarSenhaUsuario(${u.id}, "${u.nome}")' class="bg-slate-50 border border-slate-200 hover:bg-amber-50 hover:text-amber-600 text-slate-500 px-3 py-2 rounded-lg text-xs font-bold transition-colors shadow-sm" title="Resetar para Senha Padrão (1234)"><i class="fa-solid fa-key"></i></button>
+                    
+                    <button onclick='excluirUsuario(${u.id}, "${u.login}")' class="bg-slate-50 border border-slate-200 hover:bg-red-50 hover:text-red-600 text-slate-500 px-3 py-2 rounded-lg text-xs font-bold transition-colors shadow-sm" title="Excluir Usuário"><i class="fa-solid fa-trash"></i></button>
+                </div>
+            </div>`;
+        });
+        tb.innerHTML = html;
+    }
+
+    function buscarLista() {
+        const termo = document.getElementById('buscaListagem').value.toUpperCase().trim();
+        if (!termo) return renderizarLista(listaGlobal);
+        
+        const filtrado = listaGlobal.filter(u => 
+            u.nome.toUpperCase().includes(termo) || 
+            u.login.toUpperCase().includes(termo)
+        );
+        renderizarLista(filtrado);
+    }
+
+    async function salvarUsuario() {
+        const nome = document.getElementById('nome').value.trim().toUpperCase();
+        const login = document.getElementById('login').value.trim();
+        const perfil_acesso = document.getElementById('perfil_acesso').value;
+        const editId = document.getElementById('editId').value;
+
+        if (!nome || !login || !perfil_acesso) {
+            return Swal.fire('Atenção', 'Preencha todos os campos obrigatórios (*).', 'warning');
+        }
+
+        Swal.fire({ title: 'Salvando...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+
+        // Se for Novo, insere com senha '1234'
+        if (!editId) {
+            const payload = { nome, login, senha: '1234', perfil_acesso };
+            const { error } = await client.from('usuarios').insert([payload]);
+            if (error) return Swal.fire('Erro', error.message, 'error');
+            
+            Swal.fire('Sucesso!', 'Acesso concedido. A senha inicial é 1234.', 'success');
+        } else {
+            // Se for Edição, atualiza só Nome e Perfil
+            const { error } = await client.from('usuarios').update({ nome, perfil_acesso }).eq('id', editId);
+            if (error) return Swal.fire('Erro', error.message, 'error');
+            
+            Swal.fire('Sucesso!', 'Dados atualizados.', 'success');
+        }
+
+        cancelarEdicao();
+        carregarTabela();
+    }
+
+    function editarUsuario(u) {
+        document.getElementById('editId').value = u.id;
+        document.getElementById('nome').value = u.nome;
+        document.getElementById('login').value = u.login;
+        document.getElementById('perfil_acesso').value = u.perfil_acesso;
+
+        document.getElementById('formTitulo').innerText = "Editando Usuário";
+        document.getElementById('btnCancelarEdit').classList.remove('hidden');
+        document.getElementById('avisoSenha').classList.add('hidden'); // Oculta aviso em edição
+    }
+
+    function cancelarEdicao() {
+        document.getElementById('editId').value = "";
+        document.getElementById('nome').value = "";
+        document.getElementById('login').value = "";
+        document.getElementById('perfil_acesso').value = "OPERADOR";
+
+        document.getElementById('formTitulo').innerText = "Novo Usuário";
+        document.getElementById('btnCancelarEdit').classList.add('hidden');
+        document.getElementById('avisoSenha').classList.remove('hidden');
+    }
+
+    async function resetarSenhaUsuario(id, nome) {
+        const { isConfirmed } = await Swal.fire({
+            title: 'Resetar Senha?',
+            html: `A senha de <b>${nome}</b> voltará a ser <b>1234</b>.<br>No próximo login, ele(a) será obrigado a trocar de senha.`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#f59e0b',
+            cancelButtonColor: '#cbd5e1',
+            confirmButtonText: 'Sim, resetar senha',
+            cancelButtonText: 'Cancelar'
+        });
+
+        if (isConfirmed) {
+            Swal.fire({ title: 'Resetando...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+            const { error } = await client.from('usuarios').update({ senha: '1234' }).eq('id', id);
+            
+            if (error) return Swal.fire('Erro', error.message, 'error');
+            Swal.fire('Pronto!', 'Senha resetada com sucesso.', 'success');
+            carregarTabela();
+        }
+    }
+
+    function excluirUsuario(id, login) {
+        Swal.fire({
+            title: 'Cortar Acesso?',
+            text: `O usuário ${login} não poderá mais entrar no sistema.`,
+            icon: 'error',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            cancelButtonColor: '#cbd5e1',
+            confirmButtonText: 'Sim, deletar!',
+            cancelButtonText: 'Cancelar'
+        }).then(async (result) => {
+            if (result.isConfirmed) {
+                Swal.fire({ title: 'Deletando...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+                const { error } = await client.from('usuarios').delete().eq('id', id);
+                if (error) return Swal.fire('Erro', error.message, 'error');
+                Swal.fire('Deletado!', 'Acesso revogado.', 'success');
+                carregarTabela();
+            }
+        });
+    }
+  </script>
+</body>
+</html>
