@@ -127,7 +127,6 @@
       document.getElementById('formPlano').classList.add('hidden');
       document.getElementById('btnAbrir').classList.add('hidden');
       
-      // Busca ampla corrigida (Lógica "OR" abrange Descrição e Códigos)
       const { data } = await client.from('produtos_moove')
         .select('*')
         .or(`n_item.ilike.%${termo}%,cod_moove.ilike.%${termo}%,cod_pax.ilike.%${termo}%,descricao.ilike.%${termo}%`)
@@ -190,39 +189,105 @@
       const tb = document.getElementById('listaPlanos');
       tb.innerHTML = '<div class="text-center text-slate-400 py-20 font-bold"><i class="fa-solid fa-circle-notch fa-spin text-3xl mb-3"></i><br>Carregando...</div>';
       
-      const {data, error} = await client.from('wms_planos_producao').select('*').eq('status','EM ANDAMENTO').order('id',{ascending:false});
-      if(error || !data || !data.length) return tb.innerHTML = '<div class="text-center text-slate-400 py-20 font-bold border-2 border-dashed border-slate-300 rounded-2xl bg-white"><i class="fa-solid fa-mug-hot text-4xl mb-4 text-slate-300"></i><br>Nenhuma produção em andamento no momento.</div>';
+      const {data: planos, error} = await client.from('wms_planos_producao').select('*').eq('status','EM ANDAMENTO').order('id',{ascending:false});
+      
+      if(error || !planos || !planos.length) return tb.innerHTML = '<div class="text-center text-slate-400 py-20 font-bold border-2 border-dashed border-slate-300 rounded-2xl bg-white"><i class="fa-solid fa-mug-hot text-4xl mb-4 text-slate-300"></i><br>Nenhuma produção em andamento no momento.</div>';
       
       const { data: prodData } = await client.from('produtos_moove').select('n_item, descricao');
       let dictProd = {}; if(prodData) prodData.forEach(p => dictProd[p.n_item] = p.descricao);
 
+      // Busca as Puxadas da Logística para montar a barra de progresso
+      const arrayPlanosIds = planos.map(p => p.id);
+      const { data: puxadas } = await client.from('wms_paletes').select('plano_id, qtd').in('plano_id', arrayPlanosIds);
+      
+      let mapPuxadas = {};
+      if(puxadas) {
+          puxadas.forEach(px => {
+              if(!mapPuxadas[px.plano_id]) mapPuxadas[px.plano_id] = 0;
+              mapPuxadas[px.plano_id] += parseFloat(px.qtd) || 0;
+          });
+      }
+
       let html = '';
-      data.forEach(p => {
+      planos.forEach(p => {
         let df = p.data_fabricacao.split('-').reverse().join('/');
         let desc = dictProd[p.n_item] || 'Descrição Indisponível';
         let linhaTag = p.linha_envase ? `<span class="bg-amber-100 text-amber-700 px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border border-amber-200"><i class="fa-solid fa-industry mr-1"></i> ${p.linha_envase}</span>` : '';
         
+        let qtdFisica = mapPuxadas[p.id] || 0;
+        let qtdEstimada = parseFloat(p.qtd_planejada) || 1;
+        let pct = (qtdFisica / qtdEstimada) * 100;
+        if(pct > 100) pct = 100;
+
+        let corBarra = pct < 50 ? 'bg-amber-400' : (pct < 90 ? 'bg-blue-500' : 'bg-emerald-500');
+
+        let btnDelete = qtdFisica > 0 
+            ? `<button onclick="alertarDeletePlano()" class="text-slate-300 hover:text-red-400 transition-colors" title="Não é possível apagar, Logística já iniciou a puxada."><i class="fa-solid fa-trash"></i></button>`
+            : `<button onclick="excluirPlano(${p.id}, '${p.lote}')" class="text-slate-400 hover:text-red-500 transition-colors" title="Apagar Plano (Erro de digitação)"><i class="fa-solid fa-trash"></i></button>`;
+
         html += `
-          <div class="bg-white border border-slate-200 rounded-2xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:shadow-md transition-shadow group">
-            <div class="flex-1 w-full">
-              <div class="flex flex-wrap items-center gap-2 mb-3">
-                <span class="bg-indigo-600 text-white px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest shadow-sm">#${p.id}</span>
-                <span class="text-[10px] font-black text-blue-600 uppercase tracking-widest border border-blue-200 bg-blue-50 px-2 py-1 rounded-lg">LOTE: ${p.lote}</span>
-                ${linhaTag}
-              </div>
-              <h3 class="font-black text-slate-800 text-sm leading-tight mb-2"><span class="text-slate-400 font-bold mr-1">${p.n_item}</span> ${desc}</h3>
-              <div class="flex items-center gap-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                  <span class="bg-slate-50 px-2 py-1 border border-slate-100 rounded">Planejado: <span class="text-indigo-600 font-black text-xs">${p.qtd_planejada} UN</span></span>
-                  <span>Fab: ${df}</span>
-              </div>
+          <div class="bg-white border border-slate-200 rounded-2xl p-5 hover:shadow-md transition-shadow group relative">
+            <div class="absolute right-4 top-4 flex gap-3 items-center">
+                ${btnDelete}
             </div>
-            <button onclick="encerrarPlano(${p.id}, '${p.lote}')" class="bg-slate-800 hover:bg-black text-white px-6 py-4 rounded-xl text-xs font-black whitespace-nowrap shadow-md w-full md:w-auto transition-transform active:scale-95 flex items-center justify-center gap-2 uppercase tracking-wide">
-              Encerrar Envase <i class="fa-solid fa-flag-checkered"></i>
-            </button>
+            
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div class="flex-1 w-full pr-8">
+                  <div class="flex flex-wrap items-center gap-2 mb-3">
+                    <span class="bg-indigo-600 text-white px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest shadow-sm">#${p.id}</span>
+                    <span class="text-[10px] font-black text-blue-600 uppercase tracking-widest border border-blue-200 bg-blue-50 px-2 py-1 rounded-lg">LOTE: ${p.lote}</span>
+                    ${linhaTag}
+                  </div>
+                  <h3 class="font-black text-slate-800 text-sm leading-tight mb-3"><span class="text-slate-400 font-bold mr-1">${p.n_item}</span> ${desc}</h3>
+                  
+                  <div class="flex items-center gap-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">
+                      <span>Fab: ${df}</span>
+                  </div>
+
+                  <!-- BARRA DE PROGRESSO PUXADA LOGISTICA -->
+                  <div class="w-full bg-slate-100 rounded-full h-2 mt-1 mb-1">
+                      <div class="${corBarra} h-2 rounded-full transition-all duration-500" style="width: ${pct}%"></div>
+                  </div>
+                  <div class="flex justify-between text-[9px] font-black uppercase tracking-widest mt-1">
+                      <span class="text-emerald-600">Puxado: ${qtdFisica}</span>
+                      <span class="text-indigo-600">Planejado: ${p.qtd_planejada}</span>
+                  </div>
+
+                </div>
+                
+                <button onclick="encerrarPlano(${p.id}, '${p.lote}')" class="bg-slate-800 hover:bg-black text-white px-6 py-4 rounded-xl text-xs font-black whitespace-nowrap shadow-md w-full md:w-auto transition-transform active:scale-95 flex items-center justify-center gap-2 uppercase tracking-wide mt-3 md:mt-0">
+                  Encerrar Envase <i class="fa-solid fa-flag-checkered"></i>
+                </button>
+            </div>
           </div>
         `;
       });
       tb.innerHTML = html;
+    }
+
+    function alertarDeletePlano() {
+        Swal.fire('Não é possível apagar', 'A logística já iniciou a puxada física deste plano. O vínculo de paletes já foi criado no banco. Você deve Encerrar o plano com a quantidade correta ao invés de excluí-lo.', 'warning');
+    }
+
+    function excluirPlano(id, lote) {
+        Swal.fire({
+            title: 'Apagar Plano?',
+            text: `Tem certeza que deseja cancelar o apontamento do lote ${lote}?`,
+            icon: 'error',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            cancelButtonColor: '#cbd5e1',
+            confirmButtonText: 'Sim, Apagar!',
+            cancelButtonText: 'Cancelar'
+        }).then(async (result) => {
+            if (result.isConfirmed) {
+                Swal.fire({ title: 'Apagando...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+                const { error } = await client.from('wms_planos_producao').delete().eq('id', id);
+                if (error) return Swal.fire('Erro', error.message, 'error');
+                Swal.fire('Excluído!', 'O plano foi apagado do sistema.', 'success');
+                carregarPlanos();
+            }
+        });
     }
 
     async function encerrarPlano(id, lote) {

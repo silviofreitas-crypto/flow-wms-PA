@@ -46,7 +46,7 @@
       </div>
       <div>
         <h1 class="text-2xl font-black text-slate-800 tracking-tight leading-none">Kanban de Controladoria</h1>
-        <p class="text-slate-500 font-bold text-[11px] mt-1 uppercase tracking-widest">Fluxo Contínuo de Lotes e Liberação de OPs</p>
+        <p class="text-slate-500 font-bold text-[11px] mt-1 uppercase tracking-widest">Fluxo Contínuo de Lotes, Recebimento de OP e Subida SAP</p>
       </div>
     </div>
     
@@ -78,26 +78,26 @@
             <div class="kanban-body custom-scrollbar" id="col-producao"></div>
         </div>
 
-        <!-- COLUNA 2: AGUARDANDO OP -->
+        <!-- COLUNA 2: AGUARDANDO OP FÍSICA -->
         <div class="kanban-col">
             <div class="kanban-header bg-amber-50/50 border-b-amber-200">
                 <div class="flex justify-between items-center mb-1">
-                    <h3 class="font-black text-amber-700 text-xs uppercase tracking-widest"><i class="fa-solid fa-file-signature text-amber-500 mr-1"></i> Aguardando O.P.</h3>
+                    <h3 class="font-black text-amber-700 text-xs uppercase tracking-widest"><i class="fa-solid fa-file-invoice text-amber-500 mr-1"></i> Aguard. Entrega O.P.</h3>
                     <span id="count-wait" class="bg-amber-200 text-amber-800 text-[10px] font-black px-2 py-0.5 rounded-full">0</span>
                 </div>
-                <p class="text-[9px] font-bold text-amber-600/70 uppercase">Recebidos fisicamente</p>
+                <p class="text-[9px] font-bold text-amber-600/70 uppercase">WMS Finalizado / Sem Papel</p>
             </div>
             <div class="kanban-body custom-scrollbar" id="col-aguardando"></div>
         </div>
 
-        <!-- COLUNA 3: EM ANÁLISE -->
+        <!-- COLUNA 3: AGUARDANDO SUBIDA SAP -->
         <div class="kanban-col">
             <div class="kanban-header bg-blue-50/50 border-b-blue-200">
                 <div class="flex justify-between items-center mb-1">
-                    <h3 class="font-black text-blue-700 text-xs uppercase tracking-widest"><i class="fa-solid fa-vial-circle-check text-blue-500 mr-1"></i> Em Análise (Quali)</h3>
+                    <h3 class="font-black text-blue-700 text-xs uppercase tracking-widest"><i class="fa-solid fa-cloud-arrow-up text-blue-500 mr-1"></i> Ag. Subida SAP (0SEL)</h3>
                     <span id="count-analise" class="bg-blue-200 text-blue-800 text-[10px] font-black px-2 py-0.5 rounded-full">0</span>
                 </div>
-                <p class="text-[9px] font-bold text-blue-600/70 uppercase">OPs assinadas / Aguard. Laudo</p>
+                <p class="text-[9px] font-bold text-blue-600/70 uppercase">O.P. na mão / Pendente SAP</p>
             </div>
             <div class="kanban-body custom-scrollbar" id="col-analise"></div>
         </div>
@@ -114,14 +114,14 @@
             <div class="kanban-body custom-scrollbar" id="col-retidos"></div>
         </div>
 
-        <!-- COLUNA 5: LIBERADOS HOJE -->
+        <!-- COLUNA 5: LIBERADOS NO SAP -->
         <div class="kanban-col">
             <div class="kanban-header bg-emerald-50/50 border-b-emerald-200">
                 <div class="flex justify-between items-center mb-1">
-                    <h3 class="font-black text-emerald-700 text-xs uppercase tracking-widest"><i class="fa-solid fa-truck-fast text-emerald-500 mr-1"></i> Liberados (Hoje)</h3>
+                    <h3 class="font-black text-emerald-700 text-xs uppercase tracking-widest"><i class="fa-solid fa-truck-fast text-emerald-500 mr-1"></i> Liberados SAP (Hoje)</h3>
                     <span id="count-lib" class="bg-emerald-200 text-emerald-800 text-[10px] font-black px-2 py-0.5 rounded-full">0</span>
                 </div>
-                <p class="text-[9px] font-bold text-emerald-600/70 uppercase">Livres para carregamento</p>
+                <p class="text-[9px] font-bold text-emerald-600/70 uppercase">Livres para expedir</p>
             </div>
             <div class="kanban-body custom-scrollbar" id="col-liberados"></div>
         </div>
@@ -141,7 +141,7 @@
 
         Swal.fire({ title: 'Buscando Rastreio...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
 
-        // 1. Busca Planos (Pega o mais recente atrelado ao lote)
+        // 1. Busca Planos
         const { data: planos, error: errPlanos } = await client.from('wms_planos_producao')
             .select('*').eq('lote', lote).order('created_at', {ascending: false});
 
@@ -149,7 +149,7 @@
             return Swal.fire('Não Encontrado', `O lote <b>${lote}</b> não possui histórico de produção sistêmica registrado.`, 'info');
         }
 
-        const p = planos[0]; // Plano ativo/mais recente
+        const p = planos[0]; 
         
         // 2. Busca Produto
         const { data: prods } = await client.from('produtos_moove').select('*').eq('n_item', p.n_item).single();
@@ -163,13 +163,11 @@
         let puxado = 0;
         if(paletes) { puxado = paletes.reduce((acc, pl) => acc + Number(pl.qtd), 0); }
 
-        // Formatador de Datas
         const formatDt = (isoStr) => {
             if(!isoStr) return '';
             return new Date(isoStr).toLocaleString('pt-BR', {dateStyle:'short', timeStyle:'short'});
         };
 
-        // Construção da Timeline HTML
         // NÓ 1: Produção
         let step1 = `
         <div class="relative pl-6 pb-6">
@@ -190,26 +188,26 @@
             <h4 class="text-xs font-black text-slate-800 uppercase tracking-widest leading-none">Encerramento Lote (FUP)</h4>
             <p class="text-[10px] font-bold text-slate-500 mt-1.5"><i class="fa-regular fa-clock mr-1"></i> ${txtLog}</p>
             ${p.closed_at ? `<p class="text-[10px] font-bold text-slate-500 mt-0.5"><i class="fa-regular fa-user mr-1"></i> Fechamento: <span class="text-blue-600">${p.fechado_por || 'Logística'}</span></p>` : ''}
-            <p class="text-[10px] font-bold text-slate-500 mt-0.5"><i class="fa-solid fa-cubes-stacked mr-1"></i> Recebido: <span class="text-slate-800 font-black">${puxado} UN</span></p>
+            <p class="text-[10px] font-bold text-slate-500 mt-0.5"><i class="fa-solid fa-cubes-stacked mr-1"></i> Recebido WMS: <span class="text-slate-800 font-black">${puxado} UN</span></p>
         </div>`;
 
-        // NÓ 3: Controladoria OP
+        // NÓ 3: Controladoria Recebe OP
         let hasOp = ops && ops.data_op;
         let corOp = hasOp ? 'bg-amber-500' : 'bg-slate-300';
-        let txtOp = hasOp ? formatDt(ops.data_op) : 'Aguardando Assinatura';
+        let txtOp = hasOp ? formatDt(ops.data_op) : 'Aguardando Entrega da O.P.';
         let step3 = `
         <div class="relative pl-6 pb-6">
             <div class="absolute -left-[9px] top-0.5 w-5 h-5 rounded-full ${corOp} border-[4px] border-white shadow-sm z-10"></div>
             <div class="absolute left-1 top-5 bottom-0 w-0.5 bg-slate-200"></div>
-            <h4 class="text-xs font-black text-slate-800 uppercase tracking-widest leading-none">Entrada Sistêmica (O.P.)</h4>
+            <h4 class="text-xs font-black text-slate-800 uppercase tracking-widest leading-none">Recebimento O.P. (Controladoria)</h4>
             <p class="text-[10px] font-bold text-slate-500 mt-1.5"><i class="fa-regular fa-clock mr-1"></i> ${txtOp}</p>
         </div>`;
 
-        // NÓ 4: Qualidade
+        // NÓ 4: Controladoria Sobe SAP
         let statusExp = ops ? ops.status_expedicao : 'AGUARDANDO';
         let corQuali = 'bg-slate-300';
         let iconeQuali = '';
-        let attQuali = ops && ops.data_atualizacao ? formatDt(ops.data_atualizacao) : 'Aguardando Avaliação';
+        let attQuali = ops && ops.data_atualizacao ? formatDt(ops.data_atualizacao) : 'Aguardando Subida SAP';
 
         if(statusExp === 'LIBERADO') { corQuali = 'bg-emerald-500'; iconeQuali = '<i class="fa-solid fa-check text-emerald-500 ml-1"></i>'; }
         if(statusExp === 'BLOQUEADO' || statusExp === 'NÃO') { corQuali = 'bg-red-500'; iconeQuali = '<i class="fa-solid fa-ban text-red-500 ml-1"></i>'; }
@@ -217,7 +215,7 @@
         let step4 = `
         <div class="relative pl-6">
             <div class="absolute -left-[9px] top-0.5 w-5 h-5 rounded-full ${corQuali} border-[4px] border-white shadow-sm z-10"></div>
-            <h4 class="text-xs font-black text-slate-800 uppercase tracking-widest leading-none">Veredito Qualidade</h4>
+            <h4 class="text-xs font-black text-slate-800 uppercase tracking-widest leading-none">Veredito / Subida 0SEL</h4>
             <p class="text-[10px] font-bold text-slate-500 mt-1.5"><i class="fa-regular fa-clock mr-1"></i> ${attQuali}</p>
             <p class="text-[11px] font-black text-slate-700 mt-1 uppercase tracking-widest">Status: ${statusExp} ${iconeQuali}</p>
         </div>`;
@@ -328,7 +326,7 @@
                             <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Saldo Físico</p>
                             <p class="font-black text-slate-700 text-sm">${itemFisico.qtd.toLocaleString('pt-BR')} UN</p>
                         </div>
-                        <button onclick="assinarOP('${itemFisico.n_item}', '${itemFisico.lote}')" class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-black shadow-sm uppercase active:scale-95 transition-transform"><i class="fa-solid fa-signature"></i> Assinar OP</button>
+                        <button onclick="assinarOP('${itemFisico.n_item}', '${itemFisico.lote}')" class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-black shadow-sm uppercase active:scale-95 transition-transform"><i class="fa-solid fa-check-double"></i> Recebi a O.P.</button>
                     </div>
                 </div>`;
                 cWait++;
@@ -349,7 +347,7 @@
                             <span class="text-xs font-black text-slate-700 bg-slate-100 px-2 py-1 rounded">${itemFisico.qtd.toLocaleString('pt-BR')} UN</span>
                         </div>
                         <div class="pt-3 border-t border-slate-100 flex gap-2">
-                            <button onclick="mudarStatusOP('${itemFisico.n_item}', '${itemFisico.lote}', 'LIBERADO')" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-1.5 rounded-lg text-[10px] font-black shadow-sm uppercase transition-colors"><i class="fa-solid fa-check"></i> Aprovar</button>
+                            <button onclick="mudarStatusOP('${itemFisico.n_item}', '${itemFisico.lote}', 'LIBERADO')" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-1.5 rounded-lg text-[10px] font-black shadow-sm uppercase transition-colors"><i class="fa-solid fa-cloud-arrow-up"></i> Subiu SAP</button>
                             <button onclick="mudarStatusOP('${itemFisico.n_item}', '${itemFisico.lote}', 'BLOQUEADO')" class="flex-1 bg-red-500 hover:bg-red-600 text-white py-1.5 rounded-lg text-[10px] font-black shadow-sm uppercase transition-colors"><i class="fa-solid fa-ban"></i> Reter</button>
                         </div>
                     </div>`;
@@ -366,7 +364,7 @@
                         <p class="text-xs font-bold text-slate-600 leading-tight mb-3 line-clamp-2" title="${desc}">${desc}</p>
                         <div class="pt-2 border-t border-slate-100 flex justify-between items-center mt-2">
                             <span class="font-black text-slate-700 text-sm">${itemFisico.qtd.toLocaleString('pt-BR')} UN</span>
-                            <button onclick="mudarStatusOP('${itemFisico.n_item}', '${itemFisico.lote}', 'LIBERADO')" class="bg-white border border-slate-200 hover:border-emerald-500 hover:text-emerald-600 text-slate-500 px-3 py-1.5 rounded-lg text-[10px] font-black shadow-sm uppercase transition-colors"><i class="fa-solid fa-unlock"></i> Liberar</button>
+                            <button onclick="mudarStatusOP('${itemFisico.n_item}', '${itemFisico.lote}', 'LIBERADO')" class="bg-white border border-slate-200 hover:border-emerald-500 hover:text-emerald-600 text-slate-500 px-3 py-1.5 rounded-lg text-[10px] font-black shadow-sm uppercase transition-colors"><i class="fa-solid fa-cloud-arrow-up"></i> Subiu SAP</button>
                         </div>
                     </div>`;
                     cBlock++;
@@ -379,7 +377,7 @@
                         <div class="k-card lib opacity-80 hover:opacity-100">
                             <div class="flex justify-between items-start mb-2">
                                 <span class="font-black text-slate-600 text-sm bg-slate-100 px-2 py-0.5 rounded border border-slate-200">${itemFisico.n_item}</span>
-                                <span class="bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded text-[9px] uppercase font-black tracking-widest"><i class="fa-solid fa-check-double"></i> Lib às ${dtApprov}</span>
+                                <span class="bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded text-[9px] uppercase font-black tracking-widest"><i class="fa-solid fa-check-double"></i> 0SEL às ${dtApprov}</span>
                             </div>
                             <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">LOTE: <span class="text-slate-600 font-black">${itemFisico.lote}</span></p>
                             <p class="text-xs font-bold text-slate-500 leading-tight mb-2 line-clamp-1" title="${desc}">${desc}</p>
@@ -412,9 +410,9 @@
 
     async function assinarOP(nItem, lote) {
       const { isConfirmed } = await Swal.fire({ 
-          title: 'Assinar O.P. de Entrada', 
-          html: `Deseja dar o <b>OK de Recebimento</b> para o lote <br><span class="text-amber-600 font-black text-lg">${lote}</span>?`, 
-          icon: 'question', showCancelButton: true, confirmButtonColor: '#f59e0b', confirmButtonText: 'Assinar OP', cancelButtonText: 'Cancelar' 
+          title: 'Recebimento Físico O.P.', 
+          html: `Confirma o recebimento do documento da Produção para o lote <br><span class="text-amber-600 font-black text-lg">${lote}</span>?`, 
+          icon: 'question', showCancelButton: true, confirmButtonColor: '#f59e0b', confirmButtonText: 'Confirmar OP em Mãos', cancelButtonText: 'Cancelar' 
       });
       
       if (isConfirmed) {
@@ -428,17 +426,21 @@
 
     async function mudarStatusOP(nItem, lote, novoStatus) {
       let iconStr = novoStatus === 'LIBERADO' ? 'success' : 'warning';
-      let titleStr = novoStatus === 'LIBERADO' ? 'Aprovar Lote' : 'Reter Lote';
+      let titleStr = novoStatus === 'LIBERADO' ? 'Subida de Saldo SAP' : 'Reter Lote (Bloqueio)';
       let colorStr = novoStatus === 'LIBERADO' ? '#10b981' : '#ef4444';
       
+      let htmlText = novoStatus === 'LIBERADO' 
+        ? `Confirmar que o saldo do lote <b>${lote}</b> subiu com sucesso na 0SEL e está livre para faturamento?`
+        : `Deseja realmente bloquear a expedição do lote <b>${lote}</b>?`;
+
       const { isConfirmed } = await Swal.fire({ 
           title: titleStr, 
-          html: `Confirmar novo status para o lote <b>${lote}</b>?`, 
+          html: htmlText, 
           icon: iconStr, showCancelButton: true, confirmButtonColor: colorStr, confirmButtonText: 'Sim, Confirmar', cancelButtonText: 'Cancelar' 
       });
 
       if (isConfirmed) {
-        Swal.fire({ title: 'Movendo lote...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); }});
+        Swal.fire({ title: 'Processando...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); }});
         await client.from('controle_op').update({ status_expedicao: novoStatus, data_atualizacao: new Date().toISOString() }).eq('n_item', nItem).eq('lote', lote);
         setTimeout(() => { carregarKanban(); Swal.close(); }, 500);
       }
