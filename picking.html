@@ -56,13 +56,11 @@
       
       <div class="p-4 flex-1 overflow-y-auto custom-scrollbar flex flex-col">
         
-        <!-- ========================================== -->
-        <!-- PASSO 1: VALIDAR ENDEREÇO                  -->
-        <!-- ========================================== -->
+        <!-- PASSO 1: VALIDAR ENDEREÇO -->
         <div id="passo1-endereco" class="flex flex-col flex-1 justify-center items-center">
           <div class="bg-white border-2 border-amber-200 p-8 rounded-3xl shadow-lg text-center w-full max-w-sm relative overflow-hidden">
             <div class="absolute top-0 left-0 w-full h-2 bg-amber-500"></div>
-            <span class="text-xs font-black text-amber-600 uppercase tracking-widest block mb-2"><i class="fa-solid fa-person-walking-arrow-right mr-1"></i> Caminhe até a Posição:</span>
+            <span class="text-xs font-black text-amber-600 uppercase tracking-widest block mb-2"><i class="fa-solid fa-person-walking-arrow-right mr-1"></i> Dirija-se até a Posição:</span>
             <span class="text-5xl font-black text-slate-800 block mb-8" id="alvoEnd">A-01-05</span>
             
             <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">Bipar Endereço Origem <span class="text-red-500">*</span></label>
@@ -74,9 +72,7 @@
           </div>
         </div>
 
-        <!-- ========================================== -->
-        <!-- PASSO 2: EXTRAÇÃO E AUDITORIA DO ITEM      -->
-        <!-- ========================================== -->
+        <!-- PASSO 2: EXTRAÇÃO E AUDITORIA DO ITEM -->
         <div id="passo2-coleta" class="hidden flex-col w-full">
           <!-- CARD DO PRODUTO -->
           <div class="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm text-center mb-4 relative overflow-hidden">
@@ -199,10 +195,11 @@
         Swal.fire('Concluído!', 'Este Picking não possui mais tarefas pendentes.', 'success');
         await client.from('wms_cargas').update({status: 'CONFERENCIA'}).eq('id', cid).eq('status', 'ROTEIRIZADA');
         carregarPickingsAtivos();
+        document.getElementById('telaExecucao').classList.replace('flex', 'hidden');
+        document.getElementById('telaSelecao').classList.remove('hidden');
         return;
       }
 
-      // ORDENAÇÃO A-Z DO ENDEREÇO (ROTA GUIADA)
       tarefasFila = data.sort((a, b) => (a.endereco || '').localeCompare(b.endereco || ''));
       await client.from('wms_cargas').update({status: 'SEPARACAO'}).eq('id', cid).eq('status', 'ROTEIRIZADA');
 
@@ -211,21 +208,13 @@
     }
 
     function carregarProximaTarefa() {
-      if(tarefasFila.length === 0) {
-        Swal.fire({title: 'Onda Finalizada!', text: 'Todos os paletes foram separados.', icon: 'success', confirmButtonColor: '#10b981'}).then(()=>{
-          document.getElementById('telaExecucao').classList.replace('flex', 'hidden');
-          document.getElementById('telaSelecao').classList.remove('hidden');
-          carregarPickingsAtivos();
-        });
-        return;
-      }
+      if(tarefasFila.length === 0) return iniciarPickingGuiado(); // Recarrega do banco para garantir consistência após os Swaps
 
       tarefaAtual = tarefasFila[0]; 
 
       document.getElementById('telaSelecao').classList.add('hidden');
       document.getElementById('telaExecucao').classList.replace('hidden', 'flex');
       
-      // Reseta Telas do Wizard
       document.getElementById('passo1-endereco').classList.remove('hidden');
       document.getElementById('passo2-coleta').classList.add('hidden');
       document.getElementById('passo1-endereco').classList.add('flex');
@@ -234,11 +223,9 @@
 
       document.getElementById('lblProgresso').innerHTML = `<i class="fa-solid fa-list-ol mr-1"></i> Faltam: ${tarefasFila.length}`;
       
-      // Passo 1 Info
       document.getElementById('alvoEnd').innerText = tarefaAtual.endereco || 'S/ END';
       document.getElementById('inpEnd').value = '';
 
-      // Passo 2 Info
       document.getElementById('alvoDesc').innerText = `${tarefaAtual.n_item} - ${prodInfo.descricao}`;
       document.getElementById('alvoLpnHeader').innerText = tarefaAtual.lpn_expedicao;
 
@@ -248,7 +235,6 @@
       document.getElementById('ckLote').innerText = tarefaAtual.lote;
       document.getElementById('ckQtd').innerText = `${tarefaAtual.qtd} UN`;
 
-      // Reseta Inputs Passo 2
       ['inpSeq','inpQtd','inpLpn','inpStage'].forEach(id => document.getElementById(id).value = '');
       document.getElementById('valCheckItem').value = '0';
       document.getElementById('valCheckLote').value = '0';
@@ -262,12 +248,10 @@
       let vEnd = document.getElementById('inpEnd').value.trim().toUpperCase();
       let enderecoOficial = (tarefaAtual.endereco || '').toUpperCase();
       
-      // Se tiver endereço oficial, trava. Se for vazio ('S/ END'), deixa passar livre.
       if(enderecoOficial && vEnd !== enderecoOficial) {
         return Swal.fire('Local Incorreto', `Você deve ir para a posição: ${tarefaAtual.endereco}`, 'error');
       }
 
-      // Transição Mágica para o Passo 2
       document.getElementById('passo1-endereco').classList.add('hidden');
       document.getElementById('passo1-endereco').classList.remove('flex');
       document.getElementById('passo2-coleta').classList.remove('hidden');
@@ -304,24 +288,59 @@
       if(!vSeq || !vQtd || !vLpn || !vStage) return Swal.fire('Atenção', 'Preencha todos os campos.', 'warning');
       if(cItem === '0' || cLote === '0') return Swal.fire('Check Visual Pendente', 'Você precisa confirmar visualmente o Produto e o Lote físico.', 'warning');
       
-      if(parseInt(vSeq) !== parseInt(tarefaAtual.seq_producao)) return Swal.fire('Erro de FIFO', `Sequencial errado! Você deve pegar o Seq ${tarefaAtual.seq_producao}.`, 'error');
-      if(parseFloat(vQtd) !== parseFloat(tarefaAtual.qtd)) return Swal.fire('Erro de Quantidade', `Quantidade física divergente da registrada (${tarefaAtual.qtd}).`, 'error');
-      if(vLpn !== tarefaAtual.lpn_expedicao.toUpperCase()) return Swal.fire('Erro de LPN', `Você bipou a etiqueta LPN errada para este palete.`, 'error');
+      if(vLpn !== tarefaAtual.lpn_expedicao.toUpperCase()) {
+          return Swal.fire('Erro de LPN', `Você bipou a etiqueta LPN errada para este palete. Esperado: ${tarefaAtual.lpn_expedicao}`, 'error');
+      }
 
-      Swal.fire({title: 'Movendo...', allowOutsideClick: false, didOpen:()=>Swal.showLoading()});
+      let targetId = tarefaAtual.id;
       const user = JSON.parse(localStorage.getItem('flowWmsUser')) || {nome:'Separador'};
 
+      // ----- LÓGICA DE SWAP (BYPASS DE FIFO INTELIGENTE) -----
+      if(parseInt(vSeq) !== parseInt(tarefaAtual.seq_producao)) {
+         Swal.fire({title: 'Validando Swap...', allowOutsideClick: false, didOpen:()=>Swal.showLoading()});
+         
+         const { data: paleteB, error: errB } = await client.from('wms_paletes')
+            .select('*')
+            .eq('n_item', tarefaAtual.n_item)
+            .eq('lote', tarefaAtual.lote)
+            .eq('seq_producao', vSeq)
+            .single();
+
+         if(!paleteB) return Swal.fire('Swap Negado', `O Seq ${vSeq} não foi encontrado para este Produto/Lote no estoque.`, 'error');
+         if(paleteB.endereco !== tarefaAtual.endereco) return Swal.fire('Swap Negado', `O palete Seq ${vSeq} está no endereço ${paleteB.endereco || 'Desconhecido'}, diferente do alvo atual (${tarefaAtual.endereco}).`, 'error');
+         if(['EXPEDIDO', 'LOADED', 'STAGED'].includes(paleteB.status_expedicao)) return Swal.fire('Swap Negado', `O palete Seq ${vSeq} já foi separado ou expedido anteriormente.`, 'error');
+         if(paleteB.carga_id && paleteB.carga_id !== tarefaAtual.carga_id) return Swal.fire('Swap Negado', `O palete Seq ${vSeq} já está reservado para a Carga #${paleteB.carga_id}.`, 'error');
+         if(parseFloat(vQtd) !== parseFloat(paleteB.qtd)) return Swal.fire('Erro de Quantidade', `Quantidade física divergente da registrada no Seq ${vSeq} (${paleteB.qtd} UN).`, 'error');
+
+         // Realiza a Troca Sistêmica das Variaveis de Roteirização
+         await client.from('wms_paletes').update({
+             carga_id: paleteB.carga_id,
+             lpn_expedicao: paleteB.lpn_expedicao,
+             status_expedicao: paleteB.status_expedicao,
+             picking_por: null
+         }).eq('id', tarefaAtual.id);
+
+         targetId = paleteB.id; // O palete bipado agora assume o roteiro e desce pro STAGED
+      } else {
+         if(parseFloat(vQtd) !== parseFloat(tarefaAtual.qtd)) return Swal.fire('Erro de Quantidade', `Quantidade física divergente da registrada (${tarefaAtual.qtd}).`, 'error');
+      }
+
+      Swal.fire({title: 'Movendo...', allowOutsideClick: false, didOpen:()=>Swal.showLoading()});
+
       const {error} = await client.from('wms_paletes').update({
-        status_expedicao: 'STAGED', endereco: vStage, picking_por: user.nome
-      }).eq('id', tarefaAtual.id);
+        carga_id: tarefaAtual.carga_id,
+        lpn_expedicao: tarefaAtual.lpn_expedicao,
+        status_expedicao: 'STAGED', 
+        endereco: vStage, 
+        picking_por: user.nome
+      }).eq('id', targetId);
 
       if(error) return Swal.fire('Erro', error.message, 'error');
 
       const Toast = Swal.mixin({ toast: true, position: "top-end", showConfirmButton: false, timer: 1500 });
       Toast.fire({ icon: "success", title: "Palete separado!" });
       
-      tarefasFila.shift(); 
-      carregarProximaTarefa(); 
+      iniciarPickingGuiado(); // Recarrega do banco para puxar o próximo e oficializar os swaps localmente
     }
   </script>
 </body>

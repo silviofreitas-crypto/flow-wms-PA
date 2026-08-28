@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Gestão de Separações e Embarque (SEC)</title>
+  <title>Gestão de Separações e Embarque</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -62,7 +62,7 @@
       <div class="flex items-center gap-3">
         <div class="bg-indigo-50 text-indigo-600 w-10 h-10 rounded text-lg flex items-center justify-center border border-indigo-100"><i class="fa-solid fa-list-check"></i></div>
         <div>
-          <h1 class="text-lg font-black text-slate-800 tracking-tight leading-none">Gestão de Separações (SEC)</h1>
+          <h1 class="text-lg font-black text-slate-800 tracking-tight leading-none">Gestão de Separações</h1>
           <p class="text-slate-500 font-medium text-[11px] mt-1">Acompanhamento FUP, Lançamento de NF e Emissão de Romaneio</p>
         </div>
       </div>
@@ -76,7 +76,7 @@
         <div class="flex items-center gap-2 bg-slate-50 px-3 py-1.5 border border-slate-200 rounded shadow-inner" title="Filtro aplica apenas para cargas já EXPEDIDAS.">
           <i class="fa-solid fa-calendar-day text-indigo-500 text-sm"></i>
           <div class="flex flex-col">
-            <span class="text-[9px] font-black text-slate-400 uppercase leading-none">Histórico SEC</span>
+            <span class="text-[9px] font-black text-slate-400 uppercase leading-none">Histórico Saída</span>
             <input type="date" id="dataSec" class="text-xs font-bold text-slate-700 bg-transparent border-none outline-none cursor-pointer p-0 m-0 leading-none" onchange="carregarProgressoCargas()">
           </div>
         </div>
@@ -392,9 +392,9 @@
       Swal.close();
       setTimeout(async () => {
         const { isConfirmed } = await Swal.fire({
-          title: 'Emitir Romaneio (SEC)?',
+          title: 'Emitir Romaneio?',
           html: `A carga <b>#${carga.id}</b> já possui a NF <b>${carga.nota_fiscal}</b>.<br><br>Confirma a Saída Efetiva do Caminhão e a baixa no estoque do WMS?`,
-          icon: 'question', showCancelButton: true, confirmButtonColor: '#10b981', confirmButtonText: 'Sim, Emitir SEC', cancelButtonText: 'Revisar'
+          icon: 'question', showCancelButton: true, confirmButtonColor: '#10b981', confirmButtonText: 'Sim, Emitir', cancelButtonText: 'Revisar'
         });
 
         if (isConfirmed) {
@@ -441,7 +441,7 @@
       area.innerHTML = `
         <div class="rom-header">
           <div>
-            <h1 class="rom-title">ROMANEIO DE EMBARQUE (SEC)</h1>
+            <h1 class="rom-title">ROMANEIO DE EMBARQUE</h1>
             <p class="rom-meta">DATA/HORA SAÍDA: ${dtExp}</p>
           </div>
           <div style="text-align: right;">
@@ -460,7 +460,7 @@
             <p>CLIENTE: <b>${carga.cliente}</b></p>
             <p>DESTINO / REGIÃO: <b>${carga.destino || 'N/A'}</b></p>
             <p style="color: #0f172a; font-weight: 900; background-color: #f1f5f9; padding: 2px 4px; border-radius: 4px; border: 1px solid #cbd5e1; display: inline-block;">NOTA FISCAL: ${carga.nota_fiscal || 'S/N'}</p>
-            <p>EMISSOR (SEC): <b>${carga.expedido_por || 'N/A'}</b></p>
+            <p>EMISSOR: <b>${carga.expedido_por || 'N/A'}</b></p>
           </div>
         </div>
 
