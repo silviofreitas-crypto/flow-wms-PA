@@ -184,7 +184,7 @@
           <tr class="linha-carga hover:bg-indigo-50 transition-colors group cursor-pointer ${opacityRow}" onclick="abrirAcoesCarga(${c.id})">
             <td class="font-black text-slate-800 text-sm align-middle">
               PICK #${c.id}
-              <div class="text-[9px] text-slate-400 font-bold mt-1 uppercase">PLACA: ${c.placa.includes('FAK') ? '--' : c.placa}</div>
+              <div class="text-[9px] text-slate-400 font-bold mt-1 uppercase">PLACA: ${c.placa && c.placa.includes('FAK') ? '--' : (c.placa || '--')}</div>
             </td>
             <td class="align-middle">
               <span class="text-[11px] font-bold text-slate-700 block truncate max-w-[180px]" title="${c.destino}">${c.destino}</span>
@@ -261,7 +261,8 @@
         html: `
           <div class="mt-2">
             <div class="flex justify-between bg-slate-50 p-3 rounded border border-slate-200 text-xs font-bold text-slate-600 mb-3 text-left">
-              <div><span class="text-[9px] text-slate-400 uppercase font-black tracking-widest block mb-0.5">Placa Oficial</span>${carga.placa.includes('FAK') ? '--' : carga.placa}</div>
+              <div><span class="text-[9px] text-slate-400 uppercase font-black tracking-widest block mb-0.5">Transportadora</span>${carga.transportadora || 'Pendente'}</div>
+              <div><span class="text-[9px] text-slate-400 uppercase font-black tracking-widest block mb-0.5">Placa Oficial</span>${carga.placa && carga.placa.includes('FAK') ? '--' : (carga.placa || 'Pendente')}</div>
               <div><span class="text-[9px] text-slate-400 uppercase font-black tracking-widest block mb-0.5">Motorista</span>${carga.motorista || 'Pendente'}</div>
               <div><span class="text-[9px] text-slate-400 uppercase font-black tracking-widest block mb-0.5">NF (ERP)</span>${carga.nota_fiscal || '<span class="text-red-500">Pendente</span>'}</div>
               <div><span class="text-[9px] text-slate-400 uppercase font-black tracking-widest block mb-0.5">Qtd. Paletes</span>${carga.wms_paletes.length} UN</div>
@@ -302,17 +303,21 @@
           html: `
             <div class="text-left text-sm mt-2">
               <div class="grid grid-cols-2 gap-3">
-                <div class="col-span-1">
+                <div class="col-span-2">
+                  <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Transportadora <span class="text-red-500">*</span></label>
+                  <input id="swal-transp" class="w-full bg-white border border-slate-300 p-2 rounded shadow-sm font-black uppercase text-slate-800 outline-none focus:border-indigo-500 text-xs" value="${carga.transportadora || ''}" placeholder="Nome da Transportadora">
+                </div>
+                <div class="col-span-2">
                   <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Placa Oficial <span class="text-red-500">*</span></label>
-                  <input id="swal-placa" class="w-full bg-white border border-slate-300 p-2 rounded shadow-sm font-black uppercase text-slate-800 outline-none focus:border-indigo-500 text-xs" value="${carga.placa.includes('FAK') ? '' : carga.placa}">
+                  <input id="swal-placa" class="w-full bg-white border border-slate-300 p-2 rounded shadow-sm font-black uppercase text-slate-800 outline-none focus:border-indigo-500 text-xs" value="${carga.placa && carga.placa.includes('FAK') ? '' : (carga.placa || '')}" placeholder="XXX-0000">
                 </div>
                 <div class="col-span-1">
                   <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Nome do Motorista <span class="text-red-500">*</span></label>
-                  <input id="swal-mot" class="w-full bg-white border border-slate-300 p-2 rounded shadow-sm font-bold uppercase text-slate-800 outline-none focus:border-indigo-500 text-xs" value="${carga.motorista || ''}">
+                  <input id="swal-mot" class="w-full bg-white border border-slate-300 p-2 rounded shadow-sm font-bold uppercase text-slate-800 outline-none focus:border-indigo-500 text-xs" value="${carga.motorista || ''}" placeholder="Nome do Condutor">
                 </div>
-                <div class="col-span-2">
+                <div class="col-span-1">
                   <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">RG / CPF do Motorista</label>
-                  <input id="swal-doc" class="w-full bg-white border border-slate-300 p-2 rounded shadow-sm font-bold uppercase text-slate-800 outline-none focus:border-indigo-500 text-xs" value="${carga.rg_cpf || ''}">
+                  <input id="swal-doc" class="w-full bg-white border border-slate-300 p-2 rounded shadow-sm font-bold uppercase text-slate-800 outline-none focus:border-indigo-500 text-xs" value="${carga.rg_cpf || ''}" placeholder="Documento (Opcional)">
                 </div>
               </div>
             </div>
@@ -320,6 +325,7 @@
           focusConfirm: false, showCancelButton: true, confirmButtonColor: '#4f46e5', confirmButtonText: '<i class="fa-solid fa-key"></i> Liberar Loading', cancelButtonText: 'Cancelar',
           preConfirm: () => {
             return {
+              transp: document.getElementById('swal-transp').value.trim().toUpperCase(),
               placa: document.getElementById('swal-placa').value.trim().toUpperCase(),
               mot: document.getElementById('swal-mot').value.trim().toUpperCase(),
               doc: document.getElementById('swal-doc').value.trim().toUpperCase()
@@ -328,11 +334,15 @@
         });
 
         if (formValues) {
-          if(!formValues.placa || !formValues.mot) return Swal.fire('Atenção', 'Placa e Motorista são obrigatórios.', 'warning');
+          if(!formValues.placa || !formValues.mot || !formValues.transp) return Swal.fire('Atenção', 'Transportadora, Placa e Motorista são campos obrigatórios.', 'warning');
           Swal.fire({title: 'Liberando...', allowOutsideClick: false, didOpen:()=>Swal.showLoading()});
           
           await client.from('wms_cargas').update({
-            placa: formValues.placa, motorista: formValues.mot, rg_cpf: formValues.doc, status: 'AG_LOADING'
+            transportadora: formValues.transp,
+            placa: formValues.placa, 
+            motorista: formValues.mot, 
+            rg_cpf: formValues.doc, 
+            status: 'AG_LOADING'
           }).eq('id', idCarga);
 
           Swal.fire('Veículo Liberado!', 'O botão de Embarque já aparece no PDA da Doca.', 'success');
@@ -346,20 +356,37 @@
       setTimeout(async () => {
         const { isConfirmed } = await Swal.fire({
           title: 'CANCELAR CARGA?',
-          html: `Esta ação é <b>IRREVERSÍVEL</b>.<br><br>Todo o progresso será desfeito. Os paletes retornarão para <b>AG. PUTAWAY (Transição)</b> na Armazenagem.`,
+          html: `Esta ação é <b>IRREVERSÍVEL</b>.<br><br>Os paletes já separados voltarão para a área de Transição (Putaway). Paletes não separados continuarão armazenados em seus locais originais.`,
           icon: 'error', showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#cbd5e1', confirmButtonText: '<i class="fa-solid fa-trash-can"></i> Sim, Cancelar', cancelButtonText: 'Manter'
         });
 
         if(isConfirmed) {
           Swal.fire({title: 'Resetando...', allowOutsideClick: false, didOpen:()=>Swal.showLoading()});
           
-          await client.from('wms_paletes').update({ 
-            carga_id: null, lpn_expedicao: null, status_expedicao: null, status: 'TRANSICAO', endereco: 'RETORNO DOCA', picking_por: null, conf_por: null, load_por: null 
-          }).eq('carga_id', idCarga);
+          let carga = cargasGlobais.find(c => c.id == idCarga);
+          
+          if(carga && carga.wms_paletes) {
+              const paletesNaoSeparados = carga.wms_paletes.filter(p => p.status_expedicao === 'PENDENTE_PICKING' || !p.status_expedicao).map(p => p.id);
+              const paletesSeparados = carga.wms_paletes.filter(p => p.status_expedicao && p.status_expedicao !== 'PENDENTE_PICKING').map(p => p.id);
+
+              if(paletesNaoSeparados.length > 0) {
+                  // Volta pra ser um palete normal, mantendo seu status atual (ARMAZENADO) e seu endereço
+                  await client.from('wms_paletes').update({ 
+                    carga_id: null, lpn_expedicao: null, status_expedicao: null 
+                  }).in('id', paletesNaoSeparados);
+              }
+
+              if(paletesSeparados.length > 0) {
+                  // Vai pra transição porque ele foi retirado fisicamente do lugar original dele
+                  await client.from('wms_paletes').update({ 
+                    carga_id: null, lpn_expedicao: null, status_expedicao: null, status: 'TRANSICAO', endereco: 'RETORNO DOCA', picking_por: null, conf_por: null, load_por: null 
+                  }).in('id', paletesSeparados);
+              }
+          }
 
           await client.from('wms_cargas').delete().eq('id', idCarga);
 
-          Swal.fire('Cancelada!', 'A carga foi excluída e os paletes estão aguardando Putaway.', 'success');
+          Swal.fire('Cancelada!', 'A carga foi excluída e os paletes devolvidos.', 'success');
           carregarProgressoCargas();
         }
       }, 300);
@@ -381,7 +408,6 @@
           
           await client.from('wms_cargas').update({ nota_fiscal: notaFiscal.trim().toUpperCase() }).eq('id', idCarga);
           
-          // Correção: Fecha o alerta de "Salvando" e dá o refresh na tela
           Swal.fire({title: 'NF Salva!', icon: 'success', timer: 1500, showConfirmButton: false});
           carregarProgressoCargas();
         }
